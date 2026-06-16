@@ -49,33 +49,72 @@ body {
   padding: 28px 16px 44px;
 }
 
-/* ---- ページ見出し（朝の確認ダッシュボードらしく） ---- */
-.page-header {
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--border);
+/* ---- 最上部バー（ロゴ + 日付/時刻 + AIリンク） ---- */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
 }
-.page-header .greeting {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--accent);
-  letter-spacing: 0.02em;
+/* ロゴ：かっこよくグラデーション + 字間 */
+.brand {
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  background: linear-gradient(90deg, var(--accent-strong), var(--accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
-.page-header h1 {
-  margin-top: 2px;
-  font-size: 1.55rem;
-  color: var(--text);
-  letter-spacing: -0.01em;
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
-.page-header .today {
-  margin-top: 4px;
-  font-size: 0.95rem;
-  font-weight: 500;
+/* 日付 + 現在時刻（コンパクト） */
+.clock {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  white-space: nowrap;
+}
+.clock-date {
+  font-size: 0.78rem;
   color: var(--text-sub);
 }
-.page-header .subtitle {
-  margin-top: 2px;
-  font-size: 0.8rem;
-  color: var(--text-muted);
+.clock-time {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+/* AIリンクボタン */
+.quick-links {
+  display: flex;
+  gap: 6px;
+}
+.ai-link {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-decoration: none;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--text);
+  background: var(--surface);
+  transition: background 0.15s, border-color 0.15s;
+}
+.ai-link:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.ai-link.claude {
+  border-color: var(--accent);
+  color: var(--accent-strong);
 }
 
 /* ---- 株価バー（最上部・横スクロール対応） ---- */
@@ -125,133 +164,78 @@ body {
   color: var(--text-muted);
 }
 
-/* ---- 東京の天気（左：これから12時間 / 右：週間） ---- */
-.weather-wrap {
+/* ---- 東京の天気（株価と同じスリムな横ストリップ） ---- */
+.weather-strip {
   margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.strip-scroll {
+  flex: 1;
+  min-width: 0; /* 横スクロールを正しく効かせる */
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  overflow-x: auto;
+  padding: 8px 10px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 14px;
   box-shadow: 0 1px 2px rgba(31, 30, 28, 0.04);
-  padding: 12px 12px 8px;
+  -webkit-overflow-scrolling: touch;
 }
-.weather-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  padding: 0 4px 10px;
-  gap: 8px;
-}
-.weather-head h2 {
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--text);
-}
-/* 2カラム：広い画面は横並び、狭い画面は縦積み */
-.weather-cols {
-  display: flex;
-  gap: 14px;
-  align-items: flex-start;
-}
-.hourly-col {
-  flex: 1 1 0;
-  min-width: 0; /* 横スクロールを正しく効かせる */
-}
-.weekly-col {
-  flex: 0 0 200px;
-}
-.weather-subtitle {
-  font-size: 0.75rem;
+.strip-label {
+  flex: 0 0 auto;
+  align-self: center;
+  font-size: 0.68rem;
   font-weight: 600;
   color: var(--text-sub);
-  padding: 0 4px 6px;
+  padding: 0 4px;
 }
-.weekly-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+.strip-sep {
+  flex: 0 0 auto;
+  width: 1px;
+  background: var(--border);
+  margin: 2px 4px;
 }
-.weekly-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 8px;
-  border-radius: 8px;
-}
-.weekly-row:nth-child(odd) {
-  background: var(--bg);
-}
-.weekly-day {
-  font-size: 0.78rem;
-  color: var(--text-sub);
-  width: 64px;
-  flex-shrink: 0;
-}
-.weekly-emoji {
-  font-size: 1.1rem;
-}
-.weekly-temp {
-  margin-left: auto;
-  font-size: 0.8rem;
-  font-weight: 600;
-}
-.weekly-temp .high {
-  color: var(--accent-strong);
-}
-.weekly-temp .low {
-  color: var(--cool);
-}
-.weekly-temp .sep {
-  color: var(--text-muted);
-  font-weight: 400;
-}
-@media (max-width: 640px) {
-  .weather-cols {
-    flex-direction: column;
-  }
-  .weekly-col {
-    flex: 1 1 auto;
-    width: 100%;
-  }
-}
-.hourly-updated {
-  font-size: 0.72rem;
+.strip-updated {
+  flex: 0 0 auto;
+  font-size: 0.7rem;
   color: var(--text-muted);
   white-space: nowrap;
 }
-.hourly-scroll {
-  display: flex;
-  gap: 6px;
-  overflow-x: auto;
-  padding-bottom: 6px;
-  -webkit-overflow-scrolling: touch;
-}
-.hour-cell {
+/* 天気の1コマ（時間別・日別 共通） */
+.wx-cell {
   flex: 0 0 auto;
-  width: 58px;
+  width: 50px;
   text-align: center;
-  padding: 8px 4px;
-  border-radius: 10px;
-  background: var(--bg);
+  padding: 2px 2px;
+  border-radius: 8px;
 }
-.hour-cell.now {
+.wx-cell.now {
   background: var(--accent-soft);
   outline: 1px solid var(--accent);
 }
-.hour-time {
-  font-size: 0.72rem;
+.wx-label {
+  font-size: 0.68rem;
   color: var(--text-sub);
+  white-space: nowrap;
 }
-.hour-emoji {
-  font-size: 1.3rem;
-  margin: 3px 0;
+.wx-emoji {
+  font-size: 1.15rem;
+  margin: 1px 0;
 }
-.hour-temp {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--text);
+.wx-temp {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--accent-strong);
 }
-.hour-pop {
-  font-size: 0.7rem;
+.wx-sub {
+  font-size: 0.66rem;
+  color: var(--cool);
+}
+.wx-sub.cool {
   color: var(--cool);
 }
 
@@ -260,6 +244,17 @@ body {
   font-size: 0.8rem;
   color: var(--text-muted);
   padding: 6px 8px;
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .weather-strip {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .strip-updated {
+    text-align: right;
+  }
 }
 
 /* ---- カードを並べるグリッド（自動で 1→2→3 列） ---- */
@@ -404,33 +399,6 @@ body {
 .todo-del:hover {
   background: var(--accent-soft);
   color: var(--down);
-}
-
-/* ---- 2. メモ ---- */
-.memo-list {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.memo-item {
-  border-left: 2px solid var(--accent-soft);
-  padding-left: 12px;
-}
-.memo-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 8px;
-}
-.memo-title {
-  font-weight: 600;
-  color: var(--text);
-}
-.memo-date {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  flex-shrink: 0;
 }
 
 /* ---- 共通：日付付きリスト（プレスリリース） ---- */

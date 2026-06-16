@@ -16,13 +16,7 @@ const DEFAULT_TODOS = [
   { id: 4, text: "経費精算を提出する", done: false },
 ];
 
-// 2. メモ・備忘録
-const memos = [
-  { title: "図書館の返却期限", body: "今週末まで。延長は1回まで可能。", date: "2026/06/15" },
-  { title: "アイデアメモ", body: "ダッシュボードにグラフを追加したい。", date: "2026/06/14" },
-];
-
-// 3. プレスリリース更新（架空企業）
+// 2. プレスリリース更新（架空企業）
 const pressReleases = [
   { company: "サンプル商事", title: "新サービス「サンプルクラウド」提供開始のお知らせ", date: "2026/06/16" },
   { company: "テスト製作所", title: "2026年度 第1四半期 決算説明会の開催について", date: "2026/06/15" },
@@ -49,27 +43,35 @@ const dodgers = {
 
 // ---- 表示を組み立てる関数 ----------------------------------
 
-// 0. ヘッダー：時間帯に応じたあいさつ + 今日の日付を表示
-function renderHeader() {
-  const now = new Date();
+// 0. 最上部バーの時計：本日の日付 + 現在時刻を毎秒更新
+function startClock() {
+  const dateEl = document.getElementById("today-date");
+  const timeEl = document.getElementById("clock-time");
   const days = ["日", "月", "火", "水", "木", "金", "土"];
-  const dateStr =
-    now.getFullYear() +
-    "年" +
-    (now.getMonth() + 1) +
-    "月" +
-    now.getDate() +
-    "日（" +
-    days[now.getDay()] +
-    "）";
-  document.getElementById("today-date").textContent = dateStr;
 
-  const hour = now.getHours();
-  let greeting = "こんにちは";
-  if (hour >= 5 && hour < 11) greeting = "おはようございます";
-  else if (hour >= 11 && hour < 18) greeting = "こんにちは";
-  else greeting = "おつかれさまです";
-  document.getElementById("greeting").textContent = greeting;
+  function tick() {
+    const now = new Date();
+    if (dateEl) {
+      dateEl.textContent =
+        now.getFullYear() +
+        "/" +
+        (now.getMonth() + 1) +
+        "/" +
+        now.getDate() +
+        "（" +
+        days[now.getDay()] +
+        "）";
+    }
+    if (timeEl) {
+      timeEl.textContent = now.toLocaleTimeString("ja-JP", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      });
+    }
+  }
+  tick();
+  setInterval(tick, 1000);
 }
 
 // ============================================================
@@ -162,9 +164,8 @@ function weatherEmoji(code) {
 }
 
 async function loadWeather() {
-  const hourlyEl = document.getElementById("hourly-weather");
-  const weeklyEl = document.getElementById("weekly-weather");
-  if (!hourlyEl || !weeklyEl) return;
+  const track = document.getElementById("weather-track");
+  if (!track) return;
   try {
     const url =
       "https://api.open-meteo.com/v1/forecast" +
@@ -176,8 +177,14 @@ async function loadWeather() {
     if (!res.ok) throw new Error("status " + res.status);
     const data = await res.json();
 
-    renderHourly(hourlyEl, data.hourly);
-    renderWeekly(weeklyEl, data.daily);
+    // 1本の横ストリップに「これから12時間」+ 区切り +「週間（明日以降）」を並べる
+    track.innerHTML =
+      '<span class="strip-label">これから</span>' +
+      hourlyCells(data.hourly) +
+      '<span class="strip-sep"></span>' +
+      '<span class="strip-label">週間</span>' +
+      weeklyCells(data.daily);
+    track.scrollLeft = 0;
 
     const updated = document.getElementById("weather-updated");
     if (updated) {
@@ -189,14 +196,13 @@ async function loadWeather() {
         });
     }
   } catch (e) {
-    hourlyEl.innerHTML =
+    track.innerHTML =
       '<div class="strip-loading">天気を取得できませんでした（次回更新で再取得します）</div>';
-    weeklyEl.innerHTML = "";
   }
 }
 
-// 現在時刻から12時間先までを表示
-function renderHourly(el, h) {
+// 現在時刻から12時間先までのセルを作る
+function hourlyCells(h) {
   const now = new Date();
   const threshold = new Date(
     now.getFullYear(),
@@ -204,7 +210,6 @@ function renderHourly(el, h) {
     now.getDate(),
     now.getHours()
   );
-  // 現在の時刻以降の最初の位置を探す
   let start = h.time.findIndex((t) => new Date(t) >= threshold);
   if (start < 0) start = 0;
   const end = Math.min(start + 12, h.time.length);
@@ -218,52 +223,51 @@ function renderHourly(el, h) {
       : null;
     const isNow = i === start ? " now" : "";
     html +=
-      '<div class="hour-cell' +
+      '<div class="wx-cell' +
       isNow +
       '">' +
-      '<div class="hour-time">' +
+      '<div class="wx-label">' +
       hour +
       "時</div>" +
-      '<div class="hour-emoji">' +
+      '<div class="wx-emoji">' +
       weatherEmoji(h.weather_code[i]) +
       "</div>" +
-      '<div class="hour-temp">' +
+      '<div class="wx-temp">' +
       temp +
       "°</div>" +
-      '<div class="hour-pop">' +
+      '<div class="wx-sub">' +
       (pop != null ? pop + "%" : "") +
       "</div>" +
       "</div>";
   }
-  el.innerHTML = html;
-  el.scrollLeft = 0;
+  return html;
 }
 
-// 明日以降の週間天気を表示
-function renderWeekly(el, d) {
+// 明日以降の週間天気のセルを作る
+function weeklyCells(d) {
   const days = ["日", "月", "火", "水", "木", "金", "土"];
   let html = "";
   for (let i = 1; i < d.time.length; i++) {
     // i=1 で明日から
     const date = new Date(d.time[i] + "T00:00:00");
-    const label =
-      date.getMonth() + 1 + "/" + date.getDate() + "（" + days[date.getDay()] + "）";
+    const label = date.getDate() + "（" + days[date.getDay()] + "）";
     html +=
-      '<div class="weekly-row">' +
-      '<span class="weekly-day">' +
+      '<div class="wx-cell">' +
+      '<div class="wx-label">' +
       label +
-      "</span>" +
-      '<span class="weekly-emoji">' +
+      "</div>" +
+      '<div class="wx-emoji">' +
       weatherEmoji(d.weather_code[i]) +
-      "</span>" +
-      '<span class="weekly-temp"><span class="high">' +
+      "</div>" +
+      '<div class="wx-temp">' +
       Math.round(d.temperature_2m_max[i]) +
-      '°</span><span class="sep"> / </span><span class="low">' +
+      "°</div>" +
+      '<div class="wx-sub cool">' +
       Math.round(d.temperature_2m_min[i]) +
-      "°</span></span>" +
+      "°</div>" +
       "</div>";
   }
-  el.innerHTML = html;
+  return html;
 }
 
 // HTMLに使う文字をエスケープ（記号がそのまま表示されるようにする）
@@ -373,29 +377,7 @@ function renderTodos() {
   el.appendChild(ul);
 }
 
-// 2. メモ
-function renderMemos() {
-  const el = document.getElementById("memo-card");
-  el.innerHTML =
-    '<ul class="memo-list">' +
-    memos
-      .map(
-        (m) =>
-          '<li class="memo-item">' +
-          '<div class="memo-top"><span class="memo-title">' +
-          esc(m.title) +
-          '</span><span class="memo-date">' +
-          esc(m.date) +
-          "</span></div>" +
-          "<div>" +
-          esc(m.body) +
-          "</div></li>"
-      )
-      .join("") +
-    "</ul>";
-}
-
-// 3. プレスリリース
+// 2. プレスリリース
 function renderPress() {
   const el = document.getElementById("press-card");
   el.innerHTML =
@@ -472,7 +454,7 @@ function renderDodgers() {
 
 // ---- 画面読み込み後にすべて表示 ----------------------------
 document.addEventListener("DOMContentLoaded", () => {
-  renderHeader();
+  startClock();
 
   // 実データ：初回取得 + 定期更新（株価60秒 / 天気10分）
   loadStocks();
@@ -481,7 +463,6 @@ document.addEventListener("DOMContentLoaded", () => {
   setInterval(loadWeather, 10 * 60 * 1000);
 
   renderTodos();
-  renderMemos();
   renderPress();
   renderDisclosures();
   renderDodgers();

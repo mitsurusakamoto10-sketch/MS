@@ -9,41 +9,33 @@
   </head>
   <body>
     <main class="container">
+      <!-- 最上部バー：ロゴ + 本日の日付/現在時刻 + AIリンク（コンパクト） -->
+      <header class="topbar">
+        <div class="brand">Myworkportal</div>
+        <div class="topbar-right">
+          <div class="clock">
+            <span class="clock-date" id="today-date"></span>
+            <span class="clock-time" id="clock-time"></span>
+          </div>
+          <nav class="quick-links" aria-label="外部リンク">
+            <a class="ai-link chatgpt" href="https://chatgpt.com" target="_blank" rel="noopener">ChatGPT</a>
+            <a class="ai-link claude" href="https://claude.ai" target="_blank" rel="noopener">Claude</a>
+          </nav>
+        </div>
+      </header>
+
       <!-- 株価バー（実データ・約60秒ごとに自動更新） -->
       <section class="ticker" id="stock-ticker" aria-label="注目株価">
         <div class="strip-loading">株価を読み込み中…</div>
       </section>
 
-      <!-- 東京の天気（実データ・約10分ごとに自動更新）
-           左：これから12時間 / 右：週間（明日以降） -->
-      <section class="weather-wrap" aria-label="東京の天気">
-        <div class="weather-head">
-          <h2>東京の天気</h2>
-          <span class="hourly-updated" id="weather-updated"></span>
+      <!-- 東京の天気（実データ・約10分ごとに自動更新）株価と同じスリムな横ストリップ -->
+      <section class="strip weather-strip" aria-label="東京の天気">
+        <div class="strip-scroll" id="weather-track">
+          <div class="strip-loading">天気を読み込み中…</div>
         </div>
-        <div class="weather-cols">
-          <div class="weather-col hourly-col">
-            <h3 class="weather-subtitle">これから12時間</h3>
-            <div class="hourly-scroll" id="hourly-weather">
-              <div class="strip-loading">天気を読み込み中…</div>
-            </div>
-          </div>
-          <div class="weather-col weekly-col">
-            <h3 class="weather-subtitle">週間（明日以降）</h3>
-            <div class="weekly-list" id="weekly-weather">
-              <div class="strip-loading">読み込み中…</div>
-            </div>
-          </div>
-        </div>
+        <span class="strip-updated" id="weather-updated"></span>
       </section>
-
-      <!-- ページ上部の見出し（あいさつ・日付は script.js が自動でセット） -->
-      <header class="page-header">
-        <p class="greeting" id="greeting">おはようございます</p>
-        <h1>マイポータル</h1>
-        <p class="today" id="today-date"></p>
-        <p class="subtitle">今日の確認事項をまとめてチェック</p>
-      </header>
 
       <!-- カードを並べるエリア。中身は script.js が組み立てます -->
       <section class="grid">
@@ -53,13 +45,7 @@
           <div class="card-body" id="todo-card"></div>
         </article>
 
-        <!-- 2. メモ・備忘録 -->
-        <article class="card">
-          <div class="card-header"><span class="icon">📝</span><h2>メモ・備忘録</h2></div>
-          <div class="card-body" id="memo-card"></div>
-        </article>
-
-        <!-- 3. プレスリリース更新 -->
+        <!-- 2. プレスリリース更新 -->
         <article class="card">
           <div class="card-header"><span class="icon">📣</span><h2>プレスリリース更新</h2></div>
           <div class="card-body" id="press-card"></div>
@@ -79,7 +65,7 @@
       </section>
 
       <footer class="page-footer">
-        株価・天気は実データです。ToDoはこのブラウザに保存されます。メモ・プレスリリース・REIT・MLBはサンプル表示です。
+        株価・天気は実データです。ToDoはこのブラウザに保存されます。プレスリリース・REIT・MLBはサンプル表示です。
       </footer>
     </main>
 
