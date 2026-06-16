@@ -1,106 +1,141 @@
 // ============================================================
-// 総合ディベロッパーのプレスリリース/ニュース取得 Function
+// 総合ディベロッパーの「公式サイト」プレスリリース取得 Function
 // ------------------------------------------------------------
-// Googleニュースの検索RSS（無料・キー不要）をサーバー側で取得し、
-// 直近1週間の記事をJSONにして返します。
-// 各社の公式IRページを直接スクレイピングするより壊れにくい方式です。
-// （公式リリースだけでなく報道記事も含みます）
+// 各社の公式サイトのニュース/リリース一覧ページをサーバー側で取得し、
+// 日付付きのリンクを抽出して、全社まとめて「最新10件」を返します。
+// （報道記事は含めず、公式HPのリリースのみに限定）
 //
 // 呼び出し: GET /api/news
+//
+// ※各社サイトのHTML構造に依存するため、構造変更時は調整が必要です。
 // ============================================================
 
-// 対象の主要総合ディベロッパー
-const DEVELOPERS = [
-  "三井不動産",
-  "三菱地所",
-  "住友不動産",
-  "東急不動産",
-  "野村不動産",
+// 各社の公式ニュース一覧ページ（先頭から順に試し、取れたものを採用）
+const SITES = [
+  {
+    company: "三井不動産",
+    urls: ["https://www.mitsuifudosan.co.jp/corporate/news/"],
+  },
+  {
+    company: "三菱地所",
+    urls: ["https://www.mec.co.jp/news/", "https://www.mec.co.jp/company/press/"],
+  },
+  {
+    company: "住友不動産",
+    urls: ["https://www.sumitomo-rd.co.jp/news/"],
+  },
+  {
+    company: "東急不動産",
+    urls: ["https://www.tokyu-land.co.jp/news/", "https://www.tokyu-land.co.jp/news.html"],
+  },
+  {
+    company: "野村不動産",
+    urls: ["https://www.nomura-re.co.jp/news/", "https://www.nomura-re.co.jp/release/"],
+  },
 ];
 
-// RSSの1タグを取り出す
-function pick(block, tag) {
-  const m = block.match(new RegExp("<" + tag + "[^>]*>([\\s\\S]*?)<\\/" + tag + ">"));
-  return m ? m[1] : "";
-}
-
-// CDATA・実体参照を除去
+// タグ・実体参照を除去
 function clean(s) {
   return s
-    .replace(/<!\[CDATA\[/g, "")
-    .replace(/\]\]>/g, "")
-    .replace(/<[^>]+>/g, "")
+    .replace(/<[^>]+>/g, " ")
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&#39;/g, "'")
     .replace(/&quot;/g, '"')
     .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
-// RSS XML から item を抽出
-function parseItems(xml) {
+// 公式ニュースページのHTMLから「日付付きのニュースリンク」を抽出
+function parseOfficial(html, baseUrl, company) {
   const items = [];
-  const blocks = xml.split("<item>").slice(1);
-  for (const raw of blocks) {
-    const block = raw.split("</item>")[0];
-    const title = clean(pick(block, "title"));
-    const link = clean(pick(block, "link"));
-    const pubDate = clean(pick(block, "pubDate"));
-    const srcMatch = block.match(/<source[^>]*url="([^"]*)"[^>]*>([\s\S]*?)<\/source>/);
-    const sourceUrl = srcMatch ? srcMatch[1] : "";
-    const sourceName = srcMatch ? clean(srcMatch[2]) : "";
-    if (title && link) items.push({ title, link, pubDate, sourceUrl, sourceName });
+  const seen = new Set();
+  const dateRe = /(20\d{2})[.\/年\-](\d{1,2})[.\/月\-](\d{1,2})/;
+  const anchorRe = /<a\b[^>]*href=["']([^"'#]+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+  let m;
+  while ((m = anchorRe.exec(html)) !== null) {
+    const href = m[1];
+    const title = clean(m[2]);
+    if (!title || title.length < 8) continue; // 短すぎる＝メニュー等を除外
+
+    let url;
+    try {
+      url = new URL(href, baseUrl).href;
+    } catch (e) {
+      continue;
+    }
+    // ニュース/リリース系のURLのみ対象
+    if (!/news|release|press|topics|information/i.test(url)) continue;
+    if (seen.has(url)) continue;
+
+    // アンカーの周辺に日付があるか（一覧では日付とリンクが近接している前提）
+    const ctxStart = Math.max(0, m.index - 280);
+    const ctx = html.slice(ctxStart, m.index + m[0].length + 40);
+    const d = ctx.match(dateRe);
+    if (!d) continue;
+
+    const y = +d[1];
+    const mo = +d[2];
+    const day = +d[3];
+    const ts = Date.UTC(y, mo - 1, day);
+    if (isNaN(ts)) continue;
+
+    seen.add(url);
+    items.push({ company, title, link: url, ts, date: mo + "/" + day });
   }
   return items;
 }
 
+// 1社分を取得（候補URLを順に試す）
+async function fetchSite(site) {
+  for (const url of site.urls) {
+    try {
+      const res = await fetch(url, {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (compatible; MyworkportalBot/1.0; +https://myworkportal.pages.dev)",
+          "Accept-Language": "ja",
+        },
+      });
+      if (!res.ok) continue;
+      const html = await res.text();
+      const items = parseOfficial(html, url, site.company);
+      if (items.length) return items;
+    } catch (e) {
+      // 次の候補URLへ
+    }
+  }
+  return [];
+}
+
 export async function onRequest() {
-  const query = DEVELOPERS.join(" OR ") + " when:7d";
-  const url =
-    "https://news.google.com/rss/search?q=" +
-    encodeURIComponent(query) +
-    "&hl=ja&gl=JP&ceid=JP:ja";
-
   try {
-    const res = await fetch(url, {
-      headers: { "User-Agent": "Mozilla/5.0", Accept: "application/rss+xml" },
-    });
-    if (!res.ok) throw new Error("status " + res.status);
-    const xml = await res.text();
+    const lists = await Promise.all(SITES.map(fetchSite));
+    const all = [].concat.apply([], lists);
 
-    const now = Date.now();
-    const weekAgo = now - 7 * 24 * 60 * 60 * 1000;
-
-    const items = parseItems(xml)
+    const items = all
+      .sort((a, b) => b.ts - a.ts)
+      .slice(0, 10)
       .map((it) => {
-        // 媒体タイトルの末尾「 - 媒体名」を除去
-        let title = it.title;
-        if (it.sourceName && title.endsWith(" - " + it.sourceName)) {
-          title = title.slice(0, -(" - " + it.sourceName).length);
-        }
-        // タイトルから対象企業名を判定
-        const company = DEVELOPERS.find((d) => title.includes(d)) || "ディベロッパー";
-        // 媒体アイコンをサムネイルに利用
         let host = "";
         try {
-          host = it.sourceUrl ? new URL(it.sourceUrl).hostname : "";
+          host = new URL(it.link).hostname;
         } catch (e) {
           host = "";
         }
-        const thumb = host
-          ? "https://www.google.com/s2/favicons?domain=" + host + "&sz=64"
-          : "";
-        const ts = it.pubDate ? Date.parse(it.pubDate) : NaN;
-        const d = isNaN(ts) ? null : new Date(ts);
-        const date = d ? d.getMonth() + 1 + "/" + d.getDate() : "";
-        return { title, link: it.link, company, source: it.sourceName, thumb, date, ts };
-      })
-      // 念のため直近7日に絞り、新しい順に並べる
-      .filter((it) => isNaN(it.ts) || it.ts >= weekAgo)
-      .sort((a, b) => (b.ts || 0) - (a.ts || 0))
-      .slice(0, 12);
+        return {
+          company: it.company,
+          title: it.title,
+          link: it.link,
+          date: it.date,
+          source: it.company + " 公式",
+          thumb: host
+            ? "https://www.google.com/s2/favicons?domain=" + host + "&sz=64"
+            : "",
+        };
+      });
 
     return new Response(
       JSON.stringify({ updatedAt: new Date().toISOString(), items }),
