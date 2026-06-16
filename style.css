@@ -303,6 +303,45 @@ body {
 }
 
 /* ---- 1. ToDo ---- */
+/* 入力欄（新規追加） */
+.todo-form {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.todo-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.85rem;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+}
+.todo-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.todo-add {
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+.todo-add:hover {
+  background: var(--accent-strong);
+}
+.todo-empty {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
 .todo-list {
   list-style: none;
   display: flex;
@@ -313,6 +352,14 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+/* チェック+テキスト部分（クリックで完了切替） */
+.todo-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
   cursor: pointer;
 }
 .todo-box {
@@ -329,7 +376,7 @@ body {
   background: #fff;
   transition: background 0.15s, border-color 0.15s;
 }
-.todo-item:hover .todo-box {
+.todo-main:hover .todo-box {
   border-color: var(--accent);
 }
 .todo-item.done .todo-box {
@@ -340,6 +387,23 @@ body {
 .todo-item.done .todo-text {
   color: var(--text-muted);
   text-decoration: line-through;
+}
+/* 削除ボタン */
+.todo-del {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.todo-del:hover {
+  background: var(--accent-soft);
+  color: var(--down);
 }
 
 /* ---- 2. メモ ---- */

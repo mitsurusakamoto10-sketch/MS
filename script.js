@@ -8,8 +8,8 @@
 
 // ---- サンプルデータ ----------------------------------------
 
-// 1. 今日のToDo
-const todos = [
+// 1. 今日のToDo（初回表示用の初期値。実データはブラウザに保存されます）
+const DEFAULT_TODOS = [
   { id: 1, text: "メールの返信を確認する", done: true },
   { id: 2, text: "週次レポートの下書き", done: false },
   { id: 3, text: "15:00 打ち合わせの資料準備", done: false },
@@ -274,23 +274,99 @@ function esc(str) {
     .replace(/>/g, "&gt;");
 }
 
-// 1. ToDo（クリックで完了の切替ができます）
+// 1. ToDo（追加・完了チェック・削除ができ、ブラウザに自動保存されます）
+const TODO_KEY = "myportal_todos";
+let todoList = loadTodos();
+
+// 保存データを読み込む（無ければ初期値）
+function loadTodos() {
+  try {
+    const raw = localStorage.getItem(TODO_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {
+    /* 読み込み失敗時は初期値を使う */
+  }
+  return DEFAULT_TODOS.slice();
+}
+
+// ブラウザに保存する
+function saveTodos() {
+  try {
+    localStorage.setItem(TODO_KEY, JSON.stringify(todoList));
+  } catch (e) {
+    /* 保存できない環境でも表示は継続 */
+  }
+}
+
 function renderTodos() {
   const el = document.getElementById("todo-card");
+  el.innerHTML = "";
+
+  // 入力欄（新規追加）
+  const form = document.createElement("form");
+  form.className = "todo-form";
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "todo-input";
+  input.placeholder = "やることを追加…";
+  const addBtn = document.createElement("button");
+  addBtn.type = "submit";
+  addBtn.className = "todo-add";
+  addBtn.textContent = "追加";
+  form.appendChild(input);
+  form.appendChild(addBtn);
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const text = input.value.trim();
+    if (!text) return;
+    todoList.push({ id: Date.now(), text, done: false });
+    input.value = "";
+    saveTodos();
+    renderTodos();
+  });
+  el.appendChild(form);
+
+  // 一覧
   const ul = document.createElement("ul");
   ul.className = "todo-list";
 
-  todos.forEach((todo) => {
+  if (todoList.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "todo-empty";
+    empty.textContent = "やることはありません。";
+    el.appendChild(empty);
+  }
+
+  todoList.forEach((todo) => {
     const li = document.createElement("li");
     li.className = "todo-item" + (todo.done ? " done" : "");
-    li.innerHTML =
+
+    // チェックボックス + テキスト（クリックで完了を切替）
+    const main = document.createElement("div");
+    main.className = "todo-main";
+    main.innerHTML =
       '<span class="todo-box">✓</span>' +
       '<span class="todo-text">' + esc(todo.text) + "</span>";
-    // クリックで done を反転させ、見た目を更新
-    li.addEventListener("click", () => {
+    main.addEventListener("click", () => {
       todo.done = !todo.done;
+      saveTodos();
       li.classList.toggle("done");
     });
+
+    // 削除ボタン
+    const del = document.createElement("button");
+    del.type = "button";
+    del.className = "todo-del";
+    del.setAttribute("aria-label", "削除");
+    del.textContent = "×";
+    del.addEventListener("click", () => {
+      todoList = todoList.filter((t) => t.id !== todo.id);
+      saveTodos();
+      renderTodos();
+    });
+
+    li.appendChild(main);
+    li.appendChild(del);
     ul.appendChild(li);
   });
 
