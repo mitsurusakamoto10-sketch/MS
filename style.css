@@ -114,7 +114,8 @@ body {
   background: var(--accent-soft);
   transform: translateY(-1px);
 }
-.ai-link img {
+.ai-link img,
+.ai-link svg {
   width: 30px;
   height: 30px;
   display: block;
