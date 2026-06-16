@@ -59,6 +59,29 @@ const dodgers = {
 
 // ---- 表示を組み立てる関数 ----------------------------------
 
+// 0. ヘッダー：時間帯に応じたあいさつ + 今日の日付を表示
+function renderHeader() {
+  const now = new Date();
+  const days = ["日", "月", "火", "水", "木", "金", "土"];
+  const dateStr =
+    now.getFullYear() +
+    "年" +
+    (now.getMonth() + 1) +
+    "月" +
+    now.getDate() +
+    "日（" +
+    days[now.getDay()] +
+    "）";
+  document.getElementById("today-date").textContent = dateStr;
+
+  const hour = now.getHours();
+  let greeting = "こんにちは";
+  if (hour >= 5 && hour < 11) greeting = "おはようございます";
+  else if (hour >= 11 && hour < 18) greeting = "こんにちは";
+  else greeting = "おつかれさまです";
+  document.getElementById("greeting").textContent = greeting;
+}
+
 // HTMLに使う文字をエスケープ（記号がそのまま表示されるようにする）
 function esc(str) {
   return String(str)
@@ -212,6 +235,7 @@ function renderDodgers() {
 
 // ---- 画面読み込み後にすべて表示 ----------------------------
 document.addEventListener("DOMContentLoaded", () => {
+  renderHeader();
   renderTodos();
   renderMemos();
   renderWeather();

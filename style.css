@@ -1,10 +1,12 @@
 /* ============================================================
    マイポータル スタイル
-   落ち着いた業務用デザイン（白基調 + スレートグレー）
+   カラースキーム：Claude（Anthropic）風
+     - 背景：温かみのあるアイボリー
+     - アクセント：コーラル（テラコッタ）
+     - 文字：落ち着いたウォームグレー
    スマホ→タブレット→PC でカードの列数が自動で変わります。
    ============================================================ */
 
-/* すべての要素の余白をリセットし、計算をわかりやすくする */
 * {
   margin: 0;
   padding: 0;
@@ -12,14 +14,22 @@
 }
 
 :root {
-  /* 色をまとめて管理（ここを変えると全体の色が変わります） */
-  --bg: #f8fafc;          /* 背景 */
-  --surface: #ffffff;     /* カードの背景 */
-  --border: #e2e8f0;      /* 枠線 */
-  --text: #1e293b;        /* 文字（濃い） */
-  --text-sub: #64748b;    /* 文字（薄い） */
-  --text-muted: #94a3b8;  /* 文字（さらに薄い・日付など） */
-  --accent: #334155;      /* アクセント（濃いスレート） */
+  /* --- Claude カラースキーム（ここを変えると全体の色が変わります） --- */
+  --bg: #f0eee6;          /* 背景：アイボリー */
+  --surface: #fbfaf7;     /* カード背景：ほぼ白の温かみのある色 */
+  --border: #e6e2d6;      /* 枠線：ウォームベージュ */
+  --text: #1f1e1c;        /* 文字（濃い）：ウォームブラック */
+  --text-sub: #6f6c61;    /* 文字（中）：ウォームグレー */
+  --text-muted: #a6a293;  /* 文字（薄い）：日付など */
+  --accent: #d97757;      /* アクセント：Claude コーラル */
+  --accent-strong: #c15f3c; /* 濃いコーラル */
+  --accent-soft: #f6e6df; /* 薄いコーラル（タグ背景など） */
+  /* セマンティックカラーも温かめに調整 */
+  --good: #6f8a5a;        /* 取得・勝ち（落ち着いたグリーン） */
+  --good-soft: #ecefe4;
+  --warn: #b07f3f;        /* 譲渡（落ち着いたアンバー） */
+  --warn-soft: #f4ebda;
+  --cool: #7c8a96;        /* 最低気温（ミュートブルーグレー） */
 }
 
 body {
@@ -31,27 +41,42 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* 中央寄せの本文幅 */
 .container {
   max-width: 1100px;
   margin: 0 auto;
-  padding: 24px 16px 40px;
+  padding: 28px 16px 44px;
 }
 
-/* ---- ページ見出し ---- */
-.page-header h1 {
-  font-size: 1.4rem;
-  color: #0f172a;
+/* ---- ページ見出し（朝の確認ダッシュボードらしく） ---- */
+.page-header {
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
 }
-.page-header .subtitle {
-  margin-top: 4px;
+.page-header .greeting {
   font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: 0.02em;
+}
+.page-header h1 {
+  margin-top: 2px;
+  font-size: 1.55rem;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+.page-header .today {
+  margin-top: 4px;
+  font-size: 0.95rem;
+  font-weight: 500;
   color: var(--text-sub);
 }
+.page-header .subtitle {
+  margin-top: 2px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
 
-/* ---- カードを並べるグリッド ----
-   auto-fill + minmax で、画面幅に応じて自動的に列数が変わります。
-   スマホ=1列 / タブレット=2列 / PC=3列 となります。 */
+/* ---- カードを並べるグリッド（自動で 1→2→3 列） ---- */
 .grid {
   margin-top: 24px;
   display: grid;
@@ -63,8 +88,8 @@ body {
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(31, 30, 28, 0.04);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -74,12 +99,12 @@ body {
   align-items: center;
   gap: 8px;
   padding: 12px 16px;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--border);
 }
 .card-header h2 {
   font-size: 0.9rem;
   font-weight: 600;
-  color: var(--accent);
+  color: var(--text);
 }
 .card-header .icon {
   font-size: 1.1rem;
@@ -108,14 +133,18 @@ body {
   width: 18px;
   height: 18px;
   flex-shrink: 0;
-  border: 1px solid #cbd5e1;
-  border-radius: 4px;
+  border: 1px solid #cbc6b6;
+  border-radius: 5px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 11px;
   color: transparent;
   background: #fff;
+  transition: background 0.15s, border-color 0.15s;
+}
+.todo-item:hover .todo-box {
+  border-color: var(--accent);
 }
 .todo-item.done .todo-box {
   background: var(--accent);
@@ -135,7 +164,7 @@ body {
   gap: 12px;
 }
 .memo-item {
-  border-left: 2px solid var(--border);
+  border-left: 2px solid var(--accent-soft);
   padding-left: 12px;
 }
 .memo-top {
@@ -145,8 +174,8 @@ body {
   gap: 8px;
 }
 .memo-title {
-  font-weight: 500;
-  color: var(--accent);
+  font-weight: 600;
+  color: var(--text);
 }
 .memo-date {
   font-size: 0.75rem;
@@ -162,8 +191,8 @@ body {
   text-align: center;
 }
 .weather-day {
-  background: #f8fafc;
-  border-radius: 8px;
+  background: var(--bg);
+  border-radius: 10px;
   padding: 12px 4px;
 }
 .weather-day .label {
@@ -175,10 +204,10 @@ body {
   margin: 4px 0;
 }
 .weather-day .temp .high {
-  color: #ef4444;
+  color: var(--accent-strong);
 }
 .weather-day .temp .low {
-  color: #0ea5e9;
+  color: var(--cool);
 }
 .weather-day .temp .sep {
   color: var(--text-muted);
@@ -190,7 +219,7 @@ body {
 }
 .list-divided li {
   padding: 8px 0;
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid var(--border);
 }
 .list-divided li:first-child {
   border-top: none;
@@ -204,10 +233,10 @@ body {
 }
 .tag {
   font-size: 0.75rem;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: #f1f5f9;
-  color: var(--text-sub);
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
 }
 .date {
   font-size: 0.75rem;
@@ -216,7 +245,7 @@ body {
 }
 .title-line {
   margin-top: 4px;
-  color: var(--accent);
+  color: var(--text);
 }
 
 /* ---- 5. 開示（REIT） ---- */
@@ -227,14 +256,14 @@ body {
   gap: 12px;
 }
 .tag-acquire {
-  background: #ecfdf5;
-  color: #047857;
-  font-weight: 500;
+  background: var(--good-soft);
+  color: var(--good);
+  font-weight: 600;
 }
 .tag-transfer {
-  background: #fffbeb;
-  color: #b45309;
-  font-weight: 500;
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-weight: 600;
 }
 .sub-line {
   margin-top: 2px;
@@ -247,18 +276,18 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #eff6ff;
-  border-radius: 8px;
+  background: var(--accent-soft);
+  border-radius: 10px;
   padding: 8px 12px;
   margin-bottom: 12px;
 }
 .dodgers-record {
-  font-weight: 600;
-  color: #1e40af;
+  font-weight: 700;
+  color: var(--accent-strong);
 }
 .dodgers-rank {
   font-size: 0.75rem;
-  color: #1d4ed8;
+  color: var(--accent-strong);
 }
 .game-list {
   list-style: none;
@@ -284,14 +313,14 @@ body {
   justify-content: center;
 }
 .result-win {
-  background: #10b981;
+  background: var(--good);
 }
 .result-lose {
-  background: #94a3b8;
+  background: var(--text-muted);
 }
 .game-score {
-  font-weight: 500;
-  color: var(--accent);
+  font-weight: 600;
+  color: var(--text);
 }
 .game-date {
   margin-left: auto;
@@ -308,12 +337,12 @@ body {
   color: var(--text-muted);
 }
 
-/* ---- 画面が狭いとき（スマホ）の微調整 ---- */
+/* ---- スマホ向けの微調整 ---- */
 @media (max-width: 480px) {
   .container {
-    padding: 16px 12px 32px;
+    padding: 18px 12px 32px;
   }
   .page-header h1 {
-    font-size: 1.25rem;
+    font-size: 1.35rem;
   }
 }

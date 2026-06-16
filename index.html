@@ -9,10 +9,12 @@
   </head>
   <body>
     <main class="container">
-      <!-- ページ上部の見出し -->
+      <!-- ページ上部の見出し（あいさつ・日付は script.js が自動でセット） -->
       <header class="page-header">
+        <p class="greeting" id="greeting">おはようございます</p>
         <h1>マイポータル</h1>
-        <p class="subtitle">自分用ダッシュボード（サンプルデータ表示）</p>
+        <p class="today" id="today-date"></p>
+        <p class="subtitle">今日の確認事項をまとめてチェック（サンプルデータ表示）</p>
       </header>
 
       <!-- 6枚のカードを並べるエリア。中身は script.js が組み立てます -->
