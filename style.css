@@ -125,8 +125,8 @@ body {
   color: var(--text-muted);
 }
 
-/* ---- 今日の天気（1時間ごと・横スクロール） ---- */
-.hourly {
+/* ---- 東京の天気（左：これから12時間 / 右：週間） ---- */
+.weather-wrap {
   margin-top: 12px;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -134,17 +134,84 @@ body {
   box-shadow: 0 1px 2px rgba(31, 30, 28, 0.04);
   padding: 12px 12px 8px;
 }
-.hourly-head {
+.weather-head {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  padding: 0 4px 8px;
+  padding: 0 4px 10px;
   gap: 8px;
 }
-.hourly-head h2 {
+.weather-head h2 {
   font-size: 0.9rem;
   font-weight: 600;
   color: var(--text);
+}
+/* 2カラム：広い画面は横並び、狭い画面は縦積み */
+.weather-cols {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.hourly-col {
+  flex: 1 1 0;
+  min-width: 0; /* 横スクロールを正しく効かせる */
+}
+.weekly-col {
+  flex: 0 0 200px;
+}
+.weather-subtitle {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-sub);
+  padding: 0 4px 6px;
+}
+.weekly-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.weekly-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 8px;
+}
+.weekly-row:nth-child(odd) {
+  background: var(--bg);
+}
+.weekly-day {
+  font-size: 0.78rem;
+  color: var(--text-sub);
+  width: 64px;
+  flex-shrink: 0;
+}
+.weekly-emoji {
+  font-size: 1.1rem;
+}
+.weekly-temp {
+  margin-left: auto;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.weekly-temp .high {
+  color: var(--accent-strong);
+}
+.weekly-temp .low {
+  color: var(--cool);
+}
+.weekly-temp .sep {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+@media (max-width: 640px) {
+  .weather-cols {
+    flex-direction: column;
+  }
+  .weekly-col {
+    flex: 1 1 auto;
+    width: 100%;
+  }
 }
 .hourly-updated {
   font-size: 0.72rem;
@@ -300,36 +367,6 @@ body {
   font-size: 0.75rem;
   color: var(--text-muted);
   flex-shrink: 0;
-}
-
-/* ---- 3. 天気 ---- */
-.weather-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  text-align: center;
-}
-.weather-day {
-  background: var(--bg);
-  border-radius: 10px;
-  padding: 12px 4px;
-}
-.weather-day .label {
-  font-size: 0.75rem;
-  color: var(--text-sub);
-}
-.weather-day .emoji {
-  font-size: 1.6rem;
-  margin: 4px 0;
-}
-.weather-day .temp .high {
-  color: var(--accent-strong);
-}
-.weather-day .temp .low {
-  color: var(--cool);
-}
-.weather-day .temp .sep {
-  color: var(--text-muted);
 }
 
 /* ---- 共通：日付付きリスト（プレスリリース） ---- */

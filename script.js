@@ -22,17 +22,7 @@ const memos = [
   { title: "アイデアメモ", body: "ダッシュボードにグラフを追加したい。", date: "2026/06/14" },
 ];
 
-// 3. 天気予報
-const weather = {
-  city: "東京",
-  forecasts: [
-    { day: "今日", weather: "晴れ", icon: "☀️", high: 28, low: 20 },
-    { day: "明日", weather: "くもり", icon: "☁️", high: 26, low: 21 },
-    { day: "明後日", weather: "雨", icon: "🌧️", high: 23, low: 19 },
-  ],
-};
-
-// 4. プレスリリース更新（架空企業）
+// 3. プレスリリース更新（架空企業）
 const pressReleases = [
   { company: "サンプル商事", title: "新サービス「サンプルクラウド」提供開始のお知らせ", date: "2026/06/16" },
   { company: "テスト製作所", title: "2026年度 第1四半期 決算説明会の開催について", date: "2026/06/15" },
@@ -171,48 +161,23 @@ function weatherEmoji(code) {
   return "☁️";
 }
 
-async function loadHourlyWeather() {
-  const el = document.getElementById("hourly-weather");
-  if (!el) return;
+async function loadWeather() {
+  const hourlyEl = document.getElementById("hourly-weather");
+  const weeklyEl = document.getElementById("weekly-weather");
+  if (!hourlyEl || !weeklyEl) return;
   try {
     const url =
       "https://api.open-meteo.com/v1/forecast" +
       "?latitude=35.6895&longitude=139.6917" +
       "&hourly=temperature_2m,precipitation_probability,weather_code" +
-      "&timezone=Asia%2FTokyo&forecast_days=1";
+      "&daily=weather_code,temperature_2m_max,temperature_2m_min" +
+      "&timezone=Asia%2FTokyo&forecast_days=7";
     const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) throw new Error("status " + res.status);
     const data = await res.json();
-    const h = data.hourly;
-    const nowHour = new Date().getHours();
 
-    let html = "";
-    for (let i = 0; i < h.time.length; i++) {
-      const hour = new Date(h.time[i]).getHours();
-      const temp = Math.round(h.temperature_2m[i]);
-      const pop = h.precipitation_probability
-        ? h.precipitation_probability[i]
-        : null;
-      const isNow = hour === nowHour ? " now" : "";
-      html +=
-        '<div class="hour-cell' +
-        isNow +
-        '">' +
-        '<div class="hour-time">' +
-        hour +
-        "時</div>" +
-        '<div class="hour-emoji">' +
-        weatherEmoji(h.weather_code[i]) +
-        "</div>" +
-        '<div class="hour-temp">' +
-        temp +
-        "°</div>" +
-        '<div class="hour-pop">' +
-        (pop != null ? pop + "%" : "") +
-        "</div>" +
-        "</div>";
-    }
-    el.innerHTML = html;
+    renderHourly(hourlyEl, data.hourly);
+    renderWeekly(weeklyEl, data.daily);
 
     const updated = document.getElementById("weather-updated");
     if (updated) {
@@ -223,14 +188,82 @@ async function loadHourlyWeather() {
           minute: "2-digit",
         });
     }
-
-    // 現在時刻のセルが見えるよう左寄せにスクロール
-    const nowCell = el.querySelector(".hour-cell.now");
-    if (nowCell) el.scrollLeft = Math.max(0, nowCell.offsetLeft - 12);
   } catch (e) {
-    el.innerHTML =
+    hourlyEl.innerHTML =
       '<div class="strip-loading">天気を取得できませんでした（次回更新で再取得します）</div>';
+    weeklyEl.innerHTML = "";
   }
+}
+
+// 現在時刻から12時間先までを表示
+function renderHourly(el, h) {
+  const now = new Date();
+  const threshold = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+    now.getHours()
+  );
+  // 現在の時刻以降の最初の位置を探す
+  let start = h.time.findIndex((t) => new Date(t) >= threshold);
+  if (start < 0) start = 0;
+  const end = Math.min(start + 12, h.time.length);
+
+  let html = "";
+  for (let i = start; i < end; i++) {
+    const hour = new Date(h.time[i]).getHours();
+    const temp = Math.round(h.temperature_2m[i]);
+    const pop = h.precipitation_probability
+      ? h.precipitation_probability[i]
+      : null;
+    const isNow = i === start ? " now" : "";
+    html +=
+      '<div class="hour-cell' +
+      isNow +
+      '">' +
+      '<div class="hour-time">' +
+      hour +
+      "時</div>" +
+      '<div class="hour-emoji">' +
+      weatherEmoji(h.weather_code[i]) +
+      "</div>" +
+      '<div class="hour-temp">' +
+      temp +
+      "°</div>" +
+      '<div class="hour-pop">' +
+      (pop != null ? pop + "%" : "") +
+      "</div>" +
+      "</div>";
+  }
+  el.innerHTML = html;
+  el.scrollLeft = 0;
+}
+
+// 明日以降の週間天気を表示
+function renderWeekly(el, d) {
+  const days = ["日", "月", "火", "水", "木", "金", "土"];
+  let html = "";
+  for (let i = 1; i < d.time.length; i++) {
+    // i=1 で明日から
+    const date = new Date(d.time[i] + "T00:00:00");
+    const label =
+      date.getMonth() + 1 + "/" + date.getDate() + "（" + days[date.getDay()] + "）";
+    html +=
+      '<div class="weekly-row">' +
+      '<span class="weekly-day">' +
+      label +
+      "</span>" +
+      '<span class="weekly-emoji">' +
+      weatherEmoji(d.weather_code[i]) +
+      "</span>" +
+      '<span class="weekly-temp"><span class="high">' +
+      Math.round(d.temperature_2m_max[i]) +
+      '°</span><span class="sep"> / </span><span class="low">' +
+      Math.round(d.temperature_2m_min[i]) +
+      "°</span></span>" +
+      "</div>";
+  }
+  el.innerHTML = html;
 }
 
 // HTMLに使う文字をエスケープ（記号がそのまま表示されるようにする）
@@ -286,30 +319,7 @@ function renderMemos() {
     "</ul>";
 }
 
-// 3. 天気
-function renderWeather() {
-  document.getElementById("weather-title").textContent =
-    "天気予報（" + weather.city + "）";
-  const el = document.getElementById("weather-card");
-  el.innerHTML =
-    '<div class="weather-grid">' +
-    weather.forecasts
-      .map(
-        (f) =>
-          '<div class="weather-day">' +
-          '<div class="label">' + esc(f.day) + "</div>" +
-          '<div class="emoji">' + f.icon + "</div>" +
-          "<div>" + esc(f.weather) + "</div>" +
-          '<div class="temp"><span class="high">' + f.high +
-          '°</span><span class="sep"> / </span><span class="low">' + f.low +
-          "°</span></div>" +
-          "</div>"
-      )
-      .join("") +
-    "</div>";
-}
-
-// 4. プレスリリース
+// 3. プレスリリース
 function renderPress() {
   const el = document.getElementById("press-card");
   el.innerHTML =
@@ -391,12 +401,11 @@ document.addEventListener("DOMContentLoaded", () => {
   // 実データ：初回取得 + 定期更新（株価60秒 / 天気10分）
   loadStocks();
   setInterval(loadStocks, 60 * 1000);
-  loadHourlyWeather();
-  setInterval(loadHourlyWeather, 10 * 60 * 1000);
+  loadWeather();
+  setInterval(loadWeather, 10 * 60 * 1000);
 
   renderTodos();
   renderMemos();
-  renderWeather();
   renderPress();
   renderDisclosures();
   renderDodgers();
