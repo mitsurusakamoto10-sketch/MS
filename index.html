@@ -33,12 +33,16 @@
         <div class="strip-loading">株価を読み込み中…</div>
       </section>
 
-      <!-- 東京の天気（実データ・約10分ごとに自動更新）株価と同じスリムな横ストリップ -->
-      <section class="strip weather-strip" aria-label="東京の天気">
-        <div class="strip-scroll" id="weather-track">
+      <!-- 天気予報（簡易表示・実データ／約10分ごとに自動更新）右側で都道府県を選択 -->
+      <section class="weather-strip" aria-label="天気予報">
+        <div class="wx-now" id="weather-now">
           <div class="strip-loading">天気を読み込み中…</div>
         </div>
-        <span class="strip-updated" id="weather-updated"></span>
+        <div class="wx-control">
+          <label class="wx-pref-label" for="pref-select">地域</label>
+          <select id="pref-select" class="wx-pref" aria-label="都道府県を選択"></select>
+          <span class="strip-updated" id="weather-updated"></span>
+        </div>
       </section>
 
       <!-- カードを並べるエリア。中身は script.js が組み立てます -->

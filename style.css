@@ -167,79 +167,100 @@ body {
   color: var(--text-muted);
 }
 
-/* ---- 東京の天気（株価と同じスリムな横ストリップ） ---- */
+/* ---- 天気予報（簡易表示 + 都道府県ダイヤル） ---- */
 .weather-strip {
   margin-top: 12px;
   display: flex;
   align-items: center;
-  gap: 8px;
-}
-.strip-scroll {
-  flex: 1;
-  min-width: 0; /* 横スクロールを正しく効かせる */
-  display: flex;
-  align-items: stretch;
-  gap: 4px;
-  overflow-x: auto;
-  padding: 8px 10px;
+  gap: 12px;
+  padding: 10px 14px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 14px;
   box-shadow: 0 1px 2px rgba(31, 30, 28, 0.04);
-  -webkit-overflow-scrolling: touch;
 }
-.strip-label {
-  flex: 0 0 auto;
-  align-self: center;
-  font-size: 0.68rem;
-  font-weight: 600;
+/* 左側：天気の中身 */
+.wx-now {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.wx-current {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.wx-cur-emoji {
+  font-size: 2.1rem;
+  line-height: 1;
+}
+.wx-cur-temp {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1.1;
+}
+.wx-cur-cond {
+  font-size: 0.76rem;
   color: var(--text-sub);
-  padding: 0 4px;
 }
-.strip-sep {
+/* 今日/明日/明後日のミニ予報 */
+.wx-mini {
+  display: flex;
+  gap: 14px;
+}
+.wx-mini-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+.wx-mini-label {
+  font-size: 0.68rem;
+  color: var(--text-sub);
+}
+.wx-mini-emoji {
+  font-size: 1.1rem;
+}
+.wx-mini-temp {
+  font-size: 0.72rem;
+  color: var(--cool);
+}
+.wx-mini-temp b {
+  color: var(--accent-strong);
+}
+/* 右側：都道府県セレクト（ダイヤル） */
+.wx-control {
   flex: 0 0 auto;
-  width: 1px;
-  background: var(--border);
-  margin: 2px 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.wx-pref-label {
+  font-size: 0.72rem;
+  color: var(--text-sub);
+}
+.wx-pref {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  cursor: pointer;
+}
+.wx-pref:focus {
+  outline: none;
+  border-color: var(--accent);
 }
 .strip-updated {
-  flex: 0 0 auto;
   font-size: 0.7rem;
   color: var(--text-muted);
   white-space: nowrap;
-}
-/* 天気の1コマ（時間別・日別 共通） */
-.wx-cell {
-  flex: 0 0 auto;
-  width: 50px;
-  text-align: center;
-  padding: 2px 2px;
-  border-radius: 8px;
-}
-.wx-cell.now {
-  background: var(--accent-soft);
-  outline: 1px solid var(--accent);
-}
-.wx-label {
-  font-size: 0.68rem;
-  color: var(--text-sub);
-  white-space: nowrap;
-}
-.wx-emoji {
-  font-size: 1.15rem;
-  margin: 1px 0;
-}
-.wx-temp {
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: var(--accent-strong);
-}
-.wx-sub {
-  font-size: 0.66rem;
-  color: var(--cool);
-}
-.wx-sub.cool {
-  color: var(--cool);
 }
 
 /* 読み込み中・エラー時の文言 */
@@ -247,16 +268,16 @@ body {
   font-size: 0.8rem;
   color: var(--text-muted);
   padding: 6px 8px;
-  white-space: nowrap;
 }
 
-@media (max-width: 480px) {
+@media (max-width: 560px) {
   .weather-strip {
     flex-direction: column;
     align-items: stretch;
+    gap: 10px;
   }
-  .strip-updated {
-    text-align: right;
+  .wx-control {
+    justify-content: flex-end;
   }
 }
 

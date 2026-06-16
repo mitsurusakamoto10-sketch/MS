@@ -131,8 +131,8 @@ function renderTickerItem(it) {
   );
 }
 
-// ---- 今日の東京の天気（1時間ごと） -------------------------
-// WMO天気コード → 絵文字（おおまかな対応）
+// ---- 天気予報（簡易表示 + 都道府県の切替） -----------------
+// WMO天気コード → 絵文字
 function weatherEmoji(code) {
   if (code === 0) return "☀️";
   if (code === 1) return "🌤️";
@@ -148,28 +148,132 @@ function weatherEmoji(code) {
   return "☁️";
 }
 
+// WMO天気コード → 日本語の天気名
+function weatherText(code) {
+  if (code === 0) return "快晴";
+  if (code === 1) return "晴れ";
+  if (code === 2) return "晴れ時々くもり";
+  if (code === 3) return "くもり";
+  if (code === 45 || code === 48) return "霧";
+  if (code >= 51 && code <= 57) return "霧雨";
+  if (code >= 61 && code <= 67) return "雨";
+  if (code >= 71 && code <= 77) return "雪";
+  if (code >= 80 && code <= 82) return "にわか雨";
+  if (code === 85 || code === 86) return "にわか雪";
+  if (code >= 95) return "雷雨";
+  return "くもり";
+}
+
+// 都道府県（各県庁所在地の座標）
+const PREFECTURES = [
+  { name: "北海道", lat: 43.0642, lon: 141.3469 },
+  { name: "青森県", lat: 40.8244, lon: 140.74 },
+  { name: "岩手県", lat: 39.7036, lon: 141.1527 },
+  { name: "宮城県", lat: 38.2688, lon: 140.8721 },
+  { name: "秋田県", lat: 39.7186, lon: 140.1024 },
+  { name: "山形県", lat: 38.2404, lon: 140.3633 },
+  { name: "福島県", lat: 37.75, lon: 140.4678 },
+  { name: "茨城県", lat: 36.3418, lon: 140.4468 },
+  { name: "栃木県", lat: 36.5658, lon: 139.8836 },
+  { name: "群馬県", lat: 36.3912, lon: 139.0608 },
+  { name: "埼玉県", lat: 35.8569, lon: 139.6489 },
+  { name: "千葉県", lat: 35.6047, lon: 140.1233 },
+  { name: "東京都", lat: 35.6895, lon: 139.6917 },
+  { name: "神奈川県", lat: 35.4478, lon: 139.6425 },
+  { name: "新潟県", lat: 37.9026, lon: 139.0236 },
+  { name: "富山県", lat: 36.6953, lon: 137.2113 },
+  { name: "石川県", lat: 36.5947, lon: 136.6256 },
+  { name: "福井県", lat: 36.0652, lon: 136.2216 },
+  { name: "山梨県", lat: 35.6642, lon: 138.5684 },
+  { name: "長野県", lat: 36.6513, lon: 138.181 },
+  { name: "岐阜県", lat: 35.3912, lon: 136.7223 },
+  { name: "静岡県", lat: 34.9769, lon: 138.3831 },
+  { name: "愛知県", lat: 35.1802, lon: 136.9066 },
+  { name: "三重県", lat: 34.7303, lon: 136.5086 },
+  { name: "滋賀県", lat: 35.0045, lon: 135.8686 },
+  { name: "京都府", lat: 35.0211, lon: 135.7556 },
+  { name: "大阪府", lat: 34.6863, lon: 135.52 },
+  { name: "兵庫県", lat: 34.6913, lon: 135.183 },
+  { name: "奈良県", lat: 34.6851, lon: 135.8048 },
+  { name: "和歌山県", lat: 34.2261, lon: 135.1675 },
+  { name: "鳥取県", lat: 35.5036, lon: 134.2383 },
+  { name: "島根県", lat: 35.4723, lon: 133.0505 },
+  { name: "岡山県", lat: 34.6618, lon: 133.9344 },
+  { name: "広島県", lat: 34.3966, lon: 132.4596 },
+  { name: "山口県", lat: 34.1859, lon: 131.4714 },
+  { name: "徳島県", lat: 34.0658, lon: 134.5593 },
+  { name: "香川県", lat: 34.3401, lon: 134.0434 },
+  { name: "愛媛県", lat: 33.8416, lon: 132.7657 },
+  { name: "高知県", lat: 33.5597, lon: 133.5311 },
+  { name: "福岡県", lat: 33.6064, lon: 130.4181 },
+  { name: "佐賀県", lat: 33.2494, lon: 130.2988 },
+  { name: "長崎県", lat: 32.7448, lon: 129.8737 },
+  { name: "熊本県", lat: 32.7898, lon: 130.7417 },
+  { name: "大分県", lat: 33.2382, lon: 131.6126 },
+  { name: "宮崎県", lat: 31.9111, lon: 131.4239 },
+  { name: "鹿児島県", lat: 31.5602, lon: 130.5581 },
+  { name: "沖縄県", lat: 26.2124, lon: 127.6809 },
+];
+const PREF_KEY = "myportal_pref";
+
+// 現在選択中の都道府県（保存値 → 無ければ東京都）
+function currentPref() {
+  let saved = null;
+  try {
+    saved = localStorage.getItem(PREF_KEY);
+  } catch (e) {
+    /* 取得できなくても既定値を使う */
+  }
+  return (
+    PREFECTURES.find((p) => p.name === saved) ||
+    PREFECTURES.find((p) => p.name === "東京都") ||
+    PREFECTURES[0]
+  );
+}
+
+// 都道府県セレクト（ダイヤル）の初期化
+function initPrefSelect() {
+  const sel = document.getElementById("pref-select");
+  if (!sel) return;
+  const cur = currentPref();
+  sel.innerHTML = PREFECTURES.map(
+    (p) =>
+      '<option value="' +
+      p.name +
+      '"' +
+      (p.name === cur.name ? " selected" : "") +
+      ">" +
+      p.name +
+      "</option>"
+  ).join("");
+  sel.addEventListener("change", () => {
+    try {
+      localStorage.setItem(PREF_KEY, sel.value);
+    } catch (e) {
+      /* 保存できなくても表示は継続 */
+    }
+    loadWeather();
+  });
+}
+
 async function loadWeather() {
-  const track = document.getElementById("weather-track");
-  if (!track) return;
+  const el = document.getElementById("weather-now");
+  if (!el) return;
+  const pref = currentPref();
   try {
     const url =
       "https://api.open-meteo.com/v1/forecast" +
-      "?latitude=35.6895&longitude=139.6917" +
-      "&hourly=temperature_2m,precipitation_probability,weather_code" +
-      "&daily=weather_code,temperature_2m_max,temperature_2m_min" +
-      "&timezone=Asia%2FTokyo&forecast_days=7";
+      "?latitude=" +
+      pref.lat +
+      "&longitude=" +
+      pref.lon +
+      "&current=temperature_2m,weather_code,precipitation" +
+      "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max" +
+      "&timezone=Asia%2FTokyo&forecast_days=3";
     const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) throw new Error("status " + res.status);
     const data = await res.json();
-
-    // 1本の横ストリップに「これから12時間」+ 区切り +「週間（明日以降）」を並べる
-    track.innerHTML =
-      '<span class="strip-label">これから</span>' +
-      hourlyCells(data.hourly) +
-      '<span class="strip-sep"></span>' +
-      '<span class="strip-label">週間</span>' +
-      weeklyCells(data.daily);
-    track.scrollLeft = 0;
+    renderWeather(el, data, pref);
 
     const updated = document.getElementById("weather-updated");
     if (updated) {
@@ -181,78 +285,59 @@ async function loadWeather() {
         });
     }
   } catch (e) {
-    track.innerHTML =
+    el.innerHTML =
       '<div class="strip-loading">天気を取得できませんでした（次回更新で再取得します）</div>';
   }
 }
 
-// 現在時刻から12時間先までのセルを作る
-function hourlyCells(h) {
-  const now = new Date();
-  const threshold = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate(),
-    now.getHours()
-  );
-  let start = h.time.findIndex((t) => new Date(t) >= threshold);
-  if (start < 0) start = 0;
-  const end = Math.min(start + 12, h.time.length);
+// 簡易表示：現在の天気 + 今日/明日/明後日のミニ予報
+function renderWeather(el, data, pref) {
+  const c = data.current || {};
+  const d = data.daily || {};
+  const code = c.weather_code;
+  const pop =
+    d.precipitation_probability_max && d.precipitation_probability_max[0] != null
+      ? d.precipitation_probability_max[0]
+      : 0;
 
-  let html = "";
-  for (let i = start; i < end; i++) {
-    const hour = new Date(h.time[i]).getHours();
-    const temp = Math.round(h.temperature_2m[i]);
-    const pop = h.precipitation_probability
-      ? h.precipitation_probability[i]
-      : null;
-    const isNow = i === start ? " now" : "";
-    html +=
-      '<div class="wx-cell' +
-      isNow +
-      '">' +
-      '<div class="wx-label">' +
-      hour +
-      "時</div>" +
-      '<div class="wx-emoji">' +
-      weatherEmoji(h.weather_code[i]) +
-      "</div>" +
-      '<div class="wx-temp">' +
-      temp +
-      "°</div>" +
-      '<div class="wx-sub">' +
-      (pop != null ? pop + "%" : "") +
-      "</div>" +
-      "</div>";
-  }
-  return html;
-}
-
-// 明日以降の週間天気のセルを作る
-function weeklyCells(d) {
-  const days = ["日", "月", "火", "水", "木", "金", "土"];
-  let html = "";
-  for (let i = 1; i < d.time.length; i++) {
-    // i=1 で明日から
-    const date = new Date(d.time[i] + "T00:00:00");
-    const label = date.getDate() + "（" + days[date.getDay()] + "）";
-    html +=
-      '<div class="wx-cell">' +
-      '<div class="wx-label">' +
-      label +
-      "</div>" +
-      '<div class="wx-emoji">' +
+  const labels = ["今日", "明日", "明後日"];
+  let mini = "";
+  for (let i = 0; i < 3 && d.time && i < d.time.length; i++) {
+    mini +=
+      '<div class="wx-mini-day">' +
+      '<span class="wx-mini-label">' +
+      labels[i] +
+      "</span>" +
+      '<span class="wx-mini-emoji">' +
       weatherEmoji(d.weather_code[i]) +
-      "</div>" +
-      '<div class="wx-temp">' +
+      "</span>" +
+      '<span class="wx-mini-temp"><b>' +
       Math.round(d.temperature_2m_max[i]) +
-      "°</div>" +
-      '<div class="wx-sub cool">' +
+      "°</b>/" +
       Math.round(d.temperature_2m_min[i]) +
-      "°</div>" +
+      "°</span>" +
       "</div>";
   }
-  return html;
+
+  el.innerHTML =
+    '<div class="wx-current">' +
+    '<span class="wx-cur-emoji">' +
+    weatherEmoji(code) +
+    "</span>" +
+    '<div class="wx-cur-main">' +
+    '<div class="wx-cur-temp">' +
+    Math.round(c.temperature_2m) +
+    "°</div>" +
+    '<div class="wx-cur-cond">' +
+    weatherText(code) +
+    " ・ 降水 " +
+    pop +
+    "%</div>" +
+    "</div>" +
+    "</div>" +
+    '<div class="wx-mini">' +
+    mini +
+    "</div>";
 }
 
 // ---- 総合ディベロッパーのプレスリリース（直近1週間・実データ） ----
@@ -385,6 +470,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // 実データ：初回取得 + 定期更新（株価60秒 / 天気10分 / ニュース30分）
   loadStocks();
   setInterval(loadStocks, 60 * 1000);
+  initPrefSelect();
   loadWeather();
   setInterval(loadWeather, 10 * 60 * 1000);
   loadNews();
