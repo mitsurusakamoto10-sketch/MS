@@ -12,7 +12,6 @@
 const SYMBOLS = [
   { symbol: "8801.T", name: "三井不動産" },
   { symbol: "8802.T", name: "三菱地所" },
-  { symbol: "8830.T", name: "住友不動産" },
   { symbol: "^N225", name: "日経平均" },
   { symbol: "1343.T", name: "東証REIT指数" }, // 東証REIT指数連動ETF(1343)
   { symbol: "^DJI", name: "NYダウ" },
