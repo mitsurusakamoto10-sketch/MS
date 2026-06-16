@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- スマホで正しい幅・拡大率で表示するための設定 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>マイポータル</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="container">
+      <!-- ページ上部の見出し -->
+      <header class="page-header">
+        <h1>マイポータル</h1>
+        <p class="subtitle">自分用ダッシュボード（サンプルデータ表示）</p>
+      </header>
+
+      <!-- 6枚のカードを並べるエリア。中身は script.js が組み立てます -->
+      <section class="grid">
+        <!-- 1. 今日のToDo -->
+        <article class="card">
+          <div class="card-header"><span class="icon">✅</span><h2>今日のToDo</h2></div>
+          <div class="card-body" id="todo-card"></div>
+        </article>
+
+        <!-- 2. メモ・備忘録 -->
+        <article class="card">
+          <div class="card-header"><span class="icon">📝</span><h2>メモ・備忘録</h2></div>
+          <div class="card-body" id="memo-card"></div>
+        </article>
+
+        <!-- 3. 天気予報 -->
+        <article class="card">
+          <div class="card-header"><span class="icon">⛅</span><h2 id="weather-title">天気予報</h2></div>
+          <div class="card-body" id="weather-card"></div>
+        </article>
+
+        <!-- 4. プレスリリース更新 -->
+        <article class="card">
+          <div class="card-header"><span class="icon">📣</span><h2>プレスリリース更新</h2></div>
+          <div class="card-body" id="press-card"></div>
+        </article>
+
+        <!-- 5. EDINET / 上場REIT物件取引チェック -->
+        <article class="card">
+          <div class="card-header"><span class="icon">🏢</span><h2>EDINET / REIT物件取引</h2></div>
+          <div class="card-body" id="disclosure-card"></div>
+        </article>
+
+        <!-- 6. MLBドジャース速報 -->
+        <article class="card">
+          <div class="card-header"><span class="icon">⚾</span><h2>MLBドジャース速報</h2></div>
+          <div class="card-body" id="dodgers-card"></div>
+        </article>
+      </section>
+
+      <footer class="page-footer">
+        表示中の内容はすべてサンプル（架空）データです。
+      </footer>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>

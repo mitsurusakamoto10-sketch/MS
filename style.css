@@ -1,0 +1,319 @@
+/* ============================================================
+   マイポータル スタイル
+   落ち着いた業務用デザイン（白基調 + スレートグレー）
+   スマホ→タブレット→PC でカードの列数が自動で変わります。
+   ============================================================ */
+
+/* すべての要素の余白をリセットし、計算をわかりやすくする */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  /* 色をまとめて管理（ここを変えると全体の色が変わります） */
+  --bg: #f8fafc;          /* 背景 */
+  --surface: #ffffff;     /* カードの背景 */
+  --border: #e2e8f0;      /* 枠線 */
+  --text: #1e293b;        /* 文字（濃い） */
+  --text-sub: #64748b;    /* 文字（薄い） */
+  --text-muted: #94a3b8;  /* 文字（さらに薄い・日付など） */
+  --accent: #334155;      /* アクセント（濃いスレート） */
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue",
+    "Hiragino Sans", "Noto Sans JP", Meiryo, sans-serif;
+  background-color: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 中央寄せの本文幅 */
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 16px 40px;
+}
+
+/* ---- ページ見出し ---- */
+.page-header h1 {
+  font-size: 1.4rem;
+  color: #0f172a;
+}
+.page-header .subtitle {
+  margin-top: 4px;
+  font-size: 0.85rem;
+  color: var(--text-sub);
+}
+
+/* ---- カードを並べるグリッド ----
+   auto-fill + minmax で、画面幅に応じて自動的に列数が変わります。
+   スマホ=1列 / タブレット=2列 / PC=3列 となります。 */
+.grid {
+  margin-top: 24px;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+
+/* ---- カード共通 ---- */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #f1f5f9;
+}
+.card-header h2 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+.card-header .icon {
+  font-size: 1.1rem;
+}
+.card-body {
+  padding: 12px 16px;
+  font-size: 0.875rem;
+  color: var(--text-sub);
+  flex: 1;
+}
+
+/* ---- 1. ToDo ---- */
+.todo-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.todo-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.todo-box {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: transparent;
+  background: #fff;
+}
+.todo-item.done .todo-box {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.todo-item.done .todo-text {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+/* ---- 2. メモ ---- */
+.memo-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.memo-item {
+  border-left: 2px solid var(--border);
+  padding-left: 12px;
+}
+.memo-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.memo-title {
+  font-weight: 500;
+  color: var(--accent);
+}
+.memo-date {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+/* ---- 3. 天気 ---- */
+.weather-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  text-align: center;
+}
+.weather-day {
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 12px 4px;
+}
+.weather-day .label {
+  font-size: 0.75rem;
+  color: var(--text-sub);
+}
+.weather-day .emoji {
+  font-size: 1.6rem;
+  margin: 4px 0;
+}
+.weather-day .temp .high {
+  color: #ef4444;
+}
+.weather-day .temp .low {
+  color: #0ea5e9;
+}
+.weather-day .temp .sep {
+  color: var(--text-muted);
+}
+
+/* ---- 共通：日付付きリスト（プレスリリース） ---- */
+.list-divided {
+  list-style: none;
+}
+.list-divided li {
+  padding: 8px 0;
+  border-top: 1px solid #f1f5f9;
+}
+.list-divided li:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+.row-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.tag {
+  font-size: 0.75rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #f1f5f9;
+  color: var(--text-sub);
+}
+.date {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.title-line {
+  margin-top: 4px;
+  color: var(--accent);
+}
+
+/* ---- 5. 開示（REIT） ---- */
+.disclosure-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.tag-acquire {
+  background: #ecfdf5;
+  color: #047857;
+  font-weight: 500;
+}
+.tag-transfer {
+  background: #fffbeb;
+  color: #b45309;
+  font-weight: 500;
+}
+.sub-line {
+  margin-top: 2px;
+  font-size: 0.75rem;
+  color: var(--text-sub);
+}
+
+/* ---- 6. ドジャース ---- */
+.dodgers-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #eff6ff;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+}
+.dodgers-record {
+  font-weight: 600;
+  color: #1e40af;
+}
+.dodgers-rank {
+  font-size: 0.75rem;
+  color: #1d4ed8;
+}
+.game-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.game-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.result-badge {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.result-win {
+  background: #10b981;
+}
+.result-lose {
+  background: #94a3b8;
+}
+.game-score {
+  font-weight: 500;
+  color: var(--accent);
+}
+.game-date {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+/* ---- フッター ---- */
+.page-footer {
+  margin-top: 32px;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* ---- 画面が狭いとき（スマホ）の微調整 ---- */
+@media (max-width: 480px) {
+  .container {
+    padding: 16px 12px 32px;
+  }
+  .page-header h1 {
+    font-size: 1.25rem;
+  }
+}
