@@ -353,7 +353,7 @@ async function loadNews() {
         '<div class="strip-loading">直近1週間のリリースが見つかりませんでした。</div>';
       return;
     }
-    el.innerHTML = data.items.map(newsCard).join("");
+    el.innerHTML = data.items.map(newsRow).join("");
 
     const updated = document.getElementById("news-updated");
     if (updated) {
@@ -370,30 +370,22 @@ async function loadNews() {
   }
 }
 
-function newsCard(it) {
-  const thumb = it.thumb
-    ? '<img src="' + escAttr(it.thumb) + '" alt="" loading="lazy" />'
-    : "🏢";
+// 1行＝1リリース（リリース日 + 会社 + タイトル、URLにリンク）
+function newsRow(it) {
   return (
-    '<a class="news-card" href="' +
+    '<a class="news-row" href="' +
     escAttr(it.link) +
     '" target="_blank" rel="noopener">' +
-    '<div class="news-thumb">' +
-    thumb +
-    "</div>" +
-    '<div class="news-body">' +
-    '<div class="news-meta"><span class="news-company">' +
-    esc(it.company) +
-    '</span><span class="news-date">' +
+    '<span class="news-row-date">' +
     esc(it.date) +
-    "</span></div>" +
-    '<div class="news-title">' +
+    "</span>" +
+    '<span class="news-row-company">' +
+    esc(it.company) +
+    "</span>" +
+    '<span class="news-row-title">' +
     esc(it.title) +
-    "</div>" +
-    '<div class="news-source">' +
-    esc(it.source || "") +
-    "</div>" +
-    "</div></a>"
+    "</span>" +
+    "</a>"
   );
 }
 
