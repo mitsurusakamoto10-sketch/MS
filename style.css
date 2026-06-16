@@ -97,24 +97,27 @@ body {
   display: flex;
   gap: 6px;
 }
+/* AIサービスのロゴリンク（アイコンボタン） */
 .ai-link {
-  font-size: 0.78rem;
-  font-weight: 600;
-  text-decoration: none;
-  padding: 5px 12px;
-  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
   border: 1px solid var(--border);
-  color: var(--text);
   background: var(--surface);
-  transition: background 0.15s, border-color 0.15s;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
 }
 .ai-link:hover {
   border-color: var(--accent);
   background: var(--accent-soft);
+  transform: translateY(-1px);
 }
-.ai-link.claude {
-  border-color: var(--accent);
-  color: var(--accent-strong);
+.ai-link img {
+  width: 30px;
+  height: 30px;
+  display: block;
 }
 
 /* ---- 株価バー（最上部・横スクロール対応） ---- */
@@ -297,108 +300,93 @@ body {
   flex: 1;
 }
 
-/* ---- 1. ToDo ---- */
-/* 入力欄（新規追加） */
-.todo-form {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 10px;
+/* ---- プレスリリース（サムネイル形式のカード） ---- */
+.news {
+  margin-top: 24px;
 }
-.todo-input {
-  flex: 1;
-  min-width: 0;
-  font-size: 0.85rem;
-  padding: 6px 10px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: #fff;
+.news-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.news-head h2 {
+  font-size: 1rem;
+  font-weight: 700;
   color: var(--text);
 }
-.todo-input:focus {
-  outline: none;
+.news-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+.news-card {
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  text-decoration: none;
+  color: var(--text);
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+}
+.news-card:hover {
   border-color: var(--accent);
+  box-shadow: 0 2px 8px rgba(31, 30, 28, 0.07);
+  transform: translateY(-1px);
 }
-.todo-add {
-  flex-shrink: 0;
-  font-size: 0.8rem;
-  font-weight: 600;
-  padding: 6px 12px;
-  border: none;
+.news-thumb {
+  flex: 0 0 48px;
+  width: 48px;
+  height: 48px;
   border-radius: 8px;
-  background: var(--accent);
-  color: #fff;
-  cursor: pointer;
-}
-.todo-add:hover {
-  background: var(--accent-strong);
-}
-.todo-empty {
-  font-size: 0.82rem;
-  color: var(--text-muted);
-}
-
-.todo-list {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.todo-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-/* チェック+テキスト部分（クリックで完了切替） */
-.todo-main {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-  min-width: 0;
-  cursor: pointer;
-}
-.todo-box {
-  width: 18px;
-  height: 18px;
-  flex-shrink: 0;
-  border: 1px solid #cbc6b6;
-  border-radius: 5px;
+  background: var(--bg);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
-  color: transparent;
-  background: #fff;
-  transition: background 0.15s, border-color 0.15s;
+  overflow: hidden;
+  font-size: 1.3rem;
 }
-.todo-main:hover .todo-box {
-  border-color: var(--accent);
+.news-thumb img {
+  width: 30px;
+  height: 30px;
 }
-.todo-item.done .todo-box {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
+.news-body {
+  flex: 1;
+  min-width: 0;
 }
-.todo-item.done .todo-text {
+.news-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.news-company {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--accent-strong);
+}
+.news-date {
+  font-size: 0.72rem;
   color: var(--text-muted);
-  text-decoration: line-through;
-}
-/* 削除ボタン */
-.todo-del {
   flex-shrink: 0;
-  width: 22px;
-  height: 22px;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 1rem;
-  line-height: 1;
-  cursor: pointer;
 }
-.todo-del:hover {
-  background: var(--accent-soft);
-  color: var(--down);
+.news-title {
+  font-size: 0.85rem;
+  line-height: 1.4;
+  margin-top: 3px;
+  color: var(--text);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.news-source {
+  font-size: 0.7rem;
+  color: var(--text-sub);
+  margin-top: 4px;
 }
 
 /* ---- 共通：日付付きリスト（プレスリリース） ---- */

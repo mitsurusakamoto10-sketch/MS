@@ -17,9 +17,13 @@
             <span class="clock-date" id="today-date"></span>
             <span class="clock-time" id="clock-time"></span>
           </div>
-          <nav class="quick-links" aria-label="外部リンク">
-            <a class="ai-link chatgpt" href="https://chatgpt.com" target="_blank" rel="noopener">ChatGPT</a>
-            <a class="ai-link claude" href="https://claude.ai" target="_blank" rel="noopener">Claude</a>
+          <nav class="quick-links" aria-label="AIサービス">
+            <a class="ai-link" href="https://chatgpt.com" target="_blank" rel="noopener" title="ChatGPT" aria-label="ChatGPTを開く">
+              <img src="https://cdn.simpleicons.org/openai/444444" alt="ChatGPT" width="30" height="30" />
+            </a>
+            <a class="ai-link" href="https://claude.ai" target="_blank" rel="noopener" title="Claude" aria-label="Claudeを開く">
+              <img src="https://cdn.simpleicons.org/claude/D97757" alt="Claude" width="30" height="30" />
+            </a>
           </nav>
         </div>
       </header>
@@ -38,26 +42,26 @@
       </section>
 
       <!-- カードを並べるエリア。中身は script.js が組み立てます -->
+      <!-- 主要総合ディベロッパーのプレスリリース・ニュース（直近1週間・実データ） -->
+      <section class="news" aria-label="ディベロッパー プレスリリース">
+        <div class="news-head">
+          <h2>総合ディベロッパー プレスリリース（直近1週間）</h2>
+          <span class="strip-updated" id="news-updated"></span>
+        </div>
+        <div class="news-grid" id="news-grid">
+          <div class="strip-loading">プレスリリースを読み込み中…</div>
+        </div>
+      </section>
+
+      <!-- カードを並べるエリア。中身は script.js が組み立てます -->
       <section class="grid">
-        <!-- 1. 今日のToDo -->
-        <article class="card">
-          <div class="card-header"><span class="icon">✅</span><h2>今日のToDo</h2></div>
-          <div class="card-body" id="todo-card"></div>
-        </article>
-
-        <!-- 2. プレスリリース更新 -->
-        <article class="card">
-          <div class="card-header"><span class="icon">📣</span><h2>プレスリリース更新</h2></div>
-          <div class="card-body" id="press-card"></div>
-        </article>
-
-        <!-- 5. EDINET / 上場REIT物件取引チェック -->
+        <!-- EDINET / 上場REIT物件取引チェック -->
         <article class="card">
           <div class="card-header"><span class="icon">🏢</span><h2>EDINET / REIT物件取引</h2></div>
           <div class="card-body" id="disclosure-card"></div>
         </article>
 
-        <!-- 6. MLBドジャース速報 -->
+        <!-- MLBドジャース速報 -->
         <article class="card">
           <div class="card-header"><span class="icon">⚾</span><h2>MLBドジャース速報</h2></div>
           <div class="card-body" id="dodgers-card"></div>
@@ -65,7 +69,7 @@
       </section>
 
       <footer class="page-footer">
-        株価・天気は実データです。ToDoはこのブラウザに保存されます。プレスリリース・REIT・MLBはサンプル表示です。
+        株価・天気・プレスリリースは実データです。REIT・MLBはサンプル表示です。
       </footer>
     </main>
 
