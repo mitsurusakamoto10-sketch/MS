@@ -82,6 +82,157 @@ function renderHeader() {
   document.getElementById("greeting").textContent = greeting;
 }
 
+// ============================================================
+// 実データ（株価・天気）の取得と自動更新
+// ・株価   ：/api/stocks（Cloudflare Pages Function 経由でYahooから取得）
+// ・天気   ：Open-Meteo から直接取得（無料・キー不要）
+// どちらも一定間隔で取り直し、常に最新を表示します。
+// ============================================================
+
+// ---- 株価バー ----------------------------------------------
+async function loadStocks() {
+  const el = document.getElementById("stock-ticker");
+  if (!el) return;
+  try {
+    const res = await fetch("/api/stocks", { cache: "no-store" });
+    if (!res.ok) throw new Error("status " + res.status);
+    const data = await res.json();
+    el.innerHTML = data.items.map(renderTickerItem).join("");
+  } catch (e) {
+    el.innerHTML =
+      '<div class="strip-loading">株価を取得できませんでした（次回更新で再取得します）</div>';
+  }
+}
+
+function renderTickerItem(it) {
+  // 取得失敗時は「—」を表示
+  if (!it.ok || it.price == null) {
+    return (
+      '<div class="ticker-item"><div class="ticker-name">' +
+      esc(it.name) +
+      '</div><div class="ticker-price">—</div></div>'
+    );
+  }
+  const price = Number(it.price).toLocaleString("ja-JP", {
+    maximumFractionDigits: 2,
+  });
+  let cls = "flat";
+  let arrow = "→";
+  let sign = "";
+  if (it.change > 0) {
+    cls = "up";
+    arrow = "▲";
+    sign = "+";
+  } else if (it.change < 0) {
+    cls = "down";
+    arrow = "▼";
+  }
+  const chg =
+    it.change != null
+      ? sign +
+        Number(it.change).toLocaleString("ja-JP", { maximumFractionDigits: 2 })
+      : "";
+  const pct =
+    it.changePct != null ? " (" + sign + it.changePct.toFixed(2) + "%)" : "";
+  return (
+    '<div class="ticker-item">' +
+    '<div class="ticker-name">' +
+    esc(it.name) +
+    "</div>" +
+    '<div class="ticker-price">' +
+    price +
+    "</div>" +
+    '<div class="ticker-change ' +
+    cls +
+    '">' +
+    arrow +
+    " " +
+    chg +
+    pct +
+    "</div>" +
+    "</div>"
+  );
+}
+
+// ---- 今日の東京の天気（1時間ごと） -------------------------
+// WMO天気コード → 絵文字（おおまかな対応）
+function weatherEmoji(code) {
+  if (code === 0) return "☀️";
+  if (code === 1) return "🌤️";
+  if (code === 2) return "⛅";
+  if (code === 3) return "☁️";
+  if (code === 45 || code === 48) return "🌫️";
+  if (code >= 51 && code <= 57) return "🌦️";
+  if (code >= 61 && code <= 67) return "🌧️";
+  if (code >= 71 && code <= 77) return "❄️";
+  if (code >= 80 && code <= 82) return "🌦️";
+  if (code === 85 || code === 86) return "🌨️";
+  if (code >= 95) return "⛈️";
+  return "☁️";
+}
+
+async function loadHourlyWeather() {
+  const el = document.getElementById("hourly-weather");
+  if (!el) return;
+  try {
+    const url =
+      "https://api.open-meteo.com/v1/forecast" +
+      "?latitude=35.6895&longitude=139.6917" +
+      "&hourly=temperature_2m,precipitation_probability,weather_code" +
+      "&timezone=Asia%2FTokyo&forecast_days=1";
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error("status " + res.status);
+    const data = await res.json();
+    const h = data.hourly;
+    const nowHour = new Date().getHours();
+
+    let html = "";
+    for (let i = 0; i < h.time.length; i++) {
+      const hour = new Date(h.time[i]).getHours();
+      const temp = Math.round(h.temperature_2m[i]);
+      const pop = h.precipitation_probability
+        ? h.precipitation_probability[i]
+        : null;
+      const isNow = hour === nowHour ? " now" : "";
+      html +=
+        '<div class="hour-cell' +
+        isNow +
+        '">' +
+        '<div class="hour-time">' +
+        hour +
+        "時</div>" +
+        '<div class="hour-emoji">' +
+        weatherEmoji(h.weather_code[i]) +
+        "</div>" +
+        '<div class="hour-temp">' +
+        temp +
+        "°</div>" +
+        '<div class="hour-pop">' +
+        (pop != null ? pop + "%" : "") +
+        "</div>" +
+        "</div>";
+    }
+    el.innerHTML = html;
+
+    const updated = document.getElementById("weather-updated");
+    if (updated) {
+      updated.textContent =
+        "更新 " +
+        new Date().toLocaleTimeString("ja-JP", {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+    }
+
+    // 現在時刻のセルが見えるよう左寄せにスクロール
+    const nowCell = el.querySelector(".hour-cell.now");
+    if (nowCell) el.scrollLeft = Math.max(0, nowCell.offsetLeft - 12);
+  } catch (e) {
+    el.innerHTML =
+      '<div class="strip-loading">天気を取得できませんでした（次回更新で再取得します）</div>';
+  }
+}
+
 // HTMLに使う文字をエスケープ（記号がそのまま表示されるようにする）
 function esc(str) {
   return String(str)
@@ -236,6 +387,13 @@ function renderDodgers() {
 // ---- 画面読み込み後にすべて表示 ----------------------------
 document.addEventListener("DOMContentLoaded", () => {
   renderHeader();
+
+  // 実データ：初回取得 + 定期更新（株価60秒 / 天気10分）
+  loadStocks();
+  setInterval(loadStocks, 60 * 1000);
+  loadHourlyWeather();
+  setInterval(loadHourlyWeather, 10 * 60 * 1000);
+
   renderTodos();
   renderMemos();
   renderWeather();

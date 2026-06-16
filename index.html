@@ -9,6 +9,22 @@
   </head>
   <body>
     <main class="container">
+      <!-- 株価バー（実データ・約60秒ごとに自動更新） -->
+      <section class="ticker" id="stock-ticker" aria-label="注目株価">
+        <div class="strip-loading">株価を読み込み中…</div>
+      </section>
+
+      <!-- 今日の東京の天気・1時間ごと（実データ・約10分ごとに自動更新） -->
+      <section class="hourly" aria-label="今日の東京の天気">
+        <div class="hourly-head">
+          <h2>今日の東京の天気（1時間ごと）</h2>
+          <span class="hourly-updated" id="weather-updated"></span>
+        </div>
+        <div class="hourly-scroll" id="hourly-weather">
+          <div class="strip-loading">天気を読み込み中…</div>
+        </div>
+      </section>
+
       <!-- ページ上部の見出し（あいさつ・日付は script.js が自動でセット） -->
       <header class="page-header">
         <p class="greeting" id="greeting">おはようございます</p>
