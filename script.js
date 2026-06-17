@@ -329,6 +329,41 @@ function renderWeather(el, data, pref) {
     "</div>";
 }
 
+// ---- 公開ページのサムネイル一覧（NFM / NewsPicks） ----------
+async function loadThumbs(src, elId) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  try {
+    const res = await fetch("/api/feed?src=" + src, { cache: "no-store" });
+    if (!res.ok) throw new Error("status " + res.status);
+    const data = await res.json();
+    if (!data.items || data.items.length === 0) {
+      el.innerHTML =
+        '<div class="strip-loading">情報を取得できませんでした（公開ページから取得不可）。</div>';
+      return;
+    }
+    el.innerHTML = data.items.map(thumbCard).join("");
+  } catch (e) {
+    el.innerHTML =
+      '<div class="strip-loading">情報を取得できませんでした（あとで再取得します）。</div>';
+  }
+}
+
+function thumbCard(it) {
+  const img = it.image
+    ? '<img class="thumb-img" src="' + escAttr(it.image) + '" alt="" loading="lazy" />'
+    : '<div class="thumb-noimg">📰</div>';
+  return (
+    '<a class="thumb-card" href="' +
+    escAttr(it.link) +
+    '" target="_blank" rel="noopener">' +
+    img +
+    '<div class="thumb-title">' +
+    esc(it.title) +
+    "</div></a>"
+  );
+}
+
 // HTMLに使う文字をエスケープ（記号がそのまま表示されるようにする）
 function esc(str) {
   return String(str)
@@ -453,6 +488,12 @@ document.addEventListener("DOMContentLoaded", () => {
   setInterval(loadWeather, 10 * 60 * 1000);
   loadMLB();
   setInterval(loadMLB, 5 * 60 * 1000);
+  loadThumbs("nfm", "nfm-grid");
+  loadThumbs("newspicks", "picks-grid");
+  setInterval(() => {
+    loadThumbs("nfm", "nfm-grid");
+    loadThumbs("newspicks", "picks-grid");
+  }, 30 * 60 * 1000);
 
   renderDisclosures();
 });
