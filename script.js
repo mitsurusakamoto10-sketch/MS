@@ -342,25 +342,21 @@ async function loadThumbs(src, elId) {
         '<div class="strip-loading">情報を取得できませんでした（公開ページから取得不可）。</div>';
       return;
     }
-    el.innerHTML = data.items.map(thumbCard).join("");
+    el.innerHTML = data.items.map(feedRow).join("");
   } catch (e) {
     el.innerHTML =
       '<div class="strip-loading">情報を取得できませんでした（あとで再取得します）。</div>';
   }
 }
 
-function thumbCard(it) {
-  const img = it.image
-    ? '<img class="thumb-img" src="' + escAttr(it.image) + '" alt="" loading="lazy" />'
-    : '<div class="thumb-noimg">📰</div>';
+// 1行＝1記事（表題のみ・記事URLにリンク）
+function feedRow(it) {
   return (
-    '<a class="thumb-card" href="' +
+    '<a class="feed-row" href="' +
     escAttr(it.link) +
     '" target="_blank" rel="noopener">' +
-    img +
-    '<div class="thumb-title">' +
     esc(it.title) +
-    "</div></a>"
+    "</a>"
   );
 }
 
