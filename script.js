@@ -15,17 +15,6 @@ const disclosures = [
   { reit: "ダミー住宅リート投資法人", type: "取得", property: "サンプルレジデンス横浜", amount: "2,100百万円", date: "2026/06/10" },
 ];
 
-// 6. MLBドジャース速報（架空の試合結果）
-const dodgers = {
-  record: "42勝28敗",
-  rank: "ナ・リーグ西地区 1位",
-  games: [
-    { date: "2026/06/15", opponent: "サンプルズ", result: "勝", score: "5 - 3" },
-    { date: "2026/06/14", opponent: "テスターズ", result: "負", score: "2 - 4" },
-    { date: "2026/06/13", opponent: "ダミーズ", result: "勝", score: "7 - 1" },
-  ],
-};
-
 // ---- 表示を組み立てる関数 ----------------------------------
 
 // 0. 最上部バーの時計：本日の日付 + 現在時刻を毎秒更新
@@ -340,55 +329,6 @@ function renderWeather(el, data, pref) {
     "</div>";
 }
 
-// ---- 総合ディベロッパーのプレスリリース（直近1週間・実データ） ----
-async function loadNews() {
-  const el = document.getElementById("news-grid");
-  if (!el) return;
-  try {
-    const res = await fetch("/api/news", { cache: "no-store" });
-    if (!res.ok) throw new Error("status " + res.status);
-    const data = await res.json();
-    if (!data.items || data.items.length === 0) {
-      el.innerHTML =
-        '<div class="strip-loading">直近1週間のリリースが見つかりませんでした。</div>';
-      return;
-    }
-    el.innerHTML = data.items.map(newsRow).join("");
-
-    const updated = document.getElementById("news-updated");
-    if (updated) {
-      updated.textContent =
-        "更新 " +
-        new Date().toLocaleTimeString("ja-JP", {
-          hour: "2-digit",
-          minute: "2-digit",
-        });
-    }
-  } catch (e) {
-    el.innerHTML =
-      '<div class="strip-loading">プレスリリースを取得できませんでした（あとで再取得します）。</div>';
-  }
-}
-
-// 1行＝1リリース（リリース日 + 会社 + タイトル、URLにリンク）
-function newsRow(it) {
-  return (
-    '<a class="news-row" href="' +
-    escAttr(it.link) +
-    '" target="_blank" rel="noopener">' +
-    '<span class="news-row-date">' +
-    esc(it.date) +
-    "</span>" +
-    '<span class="news-row-company">' +
-    esc(it.company) +
-    "</span>" +
-    '<span class="news-row-title">' +
-    esc(it.title) +
-    "</span>" +
-    "</a>"
-  );
-}
-
 // HTMLに使う文字をエスケープ（記号がそのまま表示されるようにする）
 function esc(str) {
   return String(str)
@@ -429,30 +369,76 @@ function renderDisclosures() {
     "</ul>";
 }
 
-// 6. ドジャース
-function renderDodgers() {
+// MLBドジャース（実データ：成績・結果・予定）
+async function loadMLB() {
   const el = document.getElementById("dodgers-card");
-  el.innerHTML =
+  if (!el) return;
+  try {
+    const res = await fetch("/api/mlb", { cache: "no-store" });
+    if (!res.ok) throw new Error("status " + res.status);
+    const data = await res.json();
+    renderMLB(el, data);
+  } catch (e) {
+    el.innerHTML =
+      '<div class="strip-loading">成績を取得できませんでした（あとで再取得します）。</div>';
+  }
+}
+
+function renderMLB(el, data) {
+  const games = data.games || [];
+
+  // 結果（直近5試合）と予定（今後5試合）に分ける
+  const finished = games.filter((g) => g.state === "Final" || g.state === "Live");
+  const upcoming = games.filter((g) => g.state === "Preview");
+  const recent = finished.slice(-5).reverse();
+  const next = upcoming.slice(0, 5);
+
+  const summary =
     '<div class="dodgers-summary">' +
-    '<span class="dodgers-record">' + esc(dodgers.record) + "</span>" +
-    '<span class="dodgers-rank">' + esc(dodgers.rank) + "</span></div>" +
-    '<ul class="game-list">' +
-    dodgers.games
-      .map((g) => {
-        const badgeClass = g.result === "勝" ? "result-win" : "result-lose";
-        return (
-          '<li class="game-item">' +
-          '<span class="result-badge ' + badgeClass + '">' +
-          esc(g.result) +
-          "</span>" +
-          "<span>vs " + esc(g.opponent) + "</span>" +
-          '<span class="game-score">' + esc(g.score) + "</span>" +
-          '<span class="game-date">' + esc(g.date) + "</span>" +
-          "</li>"
-        );
-      })
-      .join("") +
-    "</ul>";
+    '<span class="dodgers-record">' +
+    esc(data.record || "—") +
+    "</span>" +
+    '<span class="dodgers-rank">' +
+    esc(data.rank || "") +
+    (data.streak ? "・" + esc(data.streak) : "") +
+    "</span></div>";
+
+  el.innerHTML =
+    summary +
+    (recent.length
+      ? '<div class="mlb-subtitle">直近の試合</div>' +
+        '<ul class="game-list">' +
+        recent.map(gameRow).join("") +
+        "</ul>"
+      : "") +
+    (next.length
+      ? '<div class="mlb-subtitle">今後の予定</div>' +
+        '<ul class="game-list">' +
+        next.map(gameRow).join("") +
+        "</ul>"
+      : "");
+}
+
+function gameRow(g) {
+  let badgeClass = "result-upcoming";
+  if (g.status === "勝") badgeClass = "result-win";
+  else if (g.status === "負") badgeClass = "result-lose";
+  else if (g.status === "試合中") badgeClass = "result-live";
+
+  const vs = (g.isHome ? "vs " : "＠") + esc(g.opponent);
+  return (
+    '<li class="game-item">' +
+    '<a class="game-link" href="' +
+    escAttr(g.link) +
+    '" target="_blank" rel="noopener">' +
+    '<span class="result-badge ' + badgeClass + '">' +
+    esc(g.status) +
+    "</span>" +
+    '<span class="game-team">' + vs + "</span>" +
+    (g.score ? '<span class="game-score">' + esc(g.score) + "</span>" : "") +
+    '<span class="game-date">' + esc(g.date) + " ›</span>" +
+    "</a></li>"
+  );
 }
 
 // ---- 画面読み込み後にすべて表示 ----------------------------
@@ -465,9 +451,8 @@ document.addEventListener("DOMContentLoaded", () => {
   initPrefSelect();
   loadWeather();
   setInterval(loadWeather, 10 * 60 * 1000);
-  loadNews();
-  setInterval(loadNews, 30 * 60 * 1000);
+  loadMLB();
+  setInterval(loadMLB, 5 * 60 * 1000);
 
   renderDisclosures();
-  renderDodgers();
 });
