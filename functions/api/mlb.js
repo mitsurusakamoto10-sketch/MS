@@ -20,8 +20,9 @@ function ymd(d) {
 export async function onRequest() {
   const now = new Date();
   const season = now.getUTCFullYear();
-  const start = new Date(now.getTime() - 10 * 86400000);
-  const end = new Date(now.getTime() + 10 * 86400000);
+  // 直近1週間（過去7日〜本日）のみ
+  const start = new Date(now.getTime() - 7 * 86400000);
+  const end = now;
 
   const schedUrl =
     "https://statsapi.mlb.com/api/v1/schedule?sportId=1&teamId=" +
