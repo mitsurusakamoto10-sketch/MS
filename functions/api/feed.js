@@ -1,14 +1,11 @@
 // ============================================================
-// 公開ページのサムネイル取得 Function（NFM / NewsPicks）
+// 公開ページの記事タイトル取得 Function（NFM / NewsPicks）
 // ------------------------------------------------------------
-// ログイン前の公開トップページを取得し、記事リンク + サムネイル画像 +
-// タイトルを抽出して返します（会員ページの中身は取得しません）。
+// ログイン前の公開トップページを取得し、記事タイトル + 記事URLを
+// 抽出して返します（会員ページの中身は取得しません）。
 //
 // 呼び出し: GET /api/feed?src=nfm   または  ?src=newspicks
-//   &debug=1 で診断情報も返します。
-//
-// ※相手サイトがbot拒否(403)やJavaScript描画の場合は取得できません。
-//   その場合は debug の status / htmlLength / count をご確認ください。
+//   &debug=1 で診断情報、&raw=1 で対象HTMLの一部を返します（調整用）。
 // ============================================================
 
 const SOURCES = {
@@ -16,13 +13,34 @@ const SOURCES = {
     url: "https://nfm.nikkeibp.co.jp/",
     base: "https://nfm.nikkeibp.co.jp",
     linkRe: /\/atcl\//i,
-    limit: 8,
+    limit: 6,
+    // 「新着記事」セクションだけを対象にする
+    sectionStart: "新着記事",
+    sectionEnd: "お知らせ",
+    preferAlt: true,
+    // 先頭に付くカテゴリ表記を除去
+    stripCats: [
+      "売買・開発",
+      "売買",
+      "移転",
+      "開発",
+      "戦略",
+      "トラブル",
+      "海外",
+      "調査／データ",
+      "調査",
+      "データ",
+      "特集",
+      "市場レポート",
+      "オフィスビル",
+    ],
   },
   newspicks: {
     url: "https://newspicks.com/",
     base: "https://newspicks.com",
     linkRe: /\/news\/\d+/i,
     limit: 5,
+    preferAlt: false,
   },
 };
 
@@ -39,33 +57,29 @@ function clean(s) {
     .trim();
 }
 
-// imgタグから画像URLを取り出す（遅延読み込み属性にも対応）
-function extractImg(imgTag, base) {
-  if (!imgTag) return "";
-  let m =
-    imgTag.match(/(?:data-src|data-original|data-lazy-src)=["']([^"']+)["']/i) ||
-    imgTag.match(/\ssrc=["']([^"']+)["']/i);
-  let url = m ? m[1] : "";
-  if (!url) {
-    const ss = imgTag.match(/srcset=["']([^"', ]+)/i);
-    if (ss) url = ss[1];
-  }
-  if (!url) return "";
-  try {
-    return new URL(url, base).href;
-  } catch (e) {
-    return "";
-  }
+// CSSやスクリプトの混入を弾く
+function looksLikeJunk(s) {
+  return /[{}]|display\s*:|css-[a-z0-9]|@media|webkit/i.test(s);
 }
 
 function parse(html, conf) {
+  // 対象セクションだけに絞り込む（指定があれば）
+  let region = html;
+  if (conf.sectionStart) {
+    const si = html.indexOf(conf.sectionStart);
+    if (si >= 0) {
+      let ei = conf.sectionEnd ? html.indexOf(conf.sectionEnd, si + conf.sectionStart.length) : -1;
+      if (ei < 0) ei = si + 14000;
+      region = html.slice(si, ei);
+    }
+  }
+
   const items = [];
   const seen = new Set();
   const anchorRe = /<a\b[^>]*href=["']([^"'#]+)["'][^>]*>([\s\S]*?)<\/a>/gi;
   let m;
-  while ((m = anchorRe.exec(html)) !== null && items.length < conf.limit * 3) {
+  while ((m = anchorRe.exec(region)) !== null) {
     const href = m[1];
-    const inner = m[2];
     let url;
     try {
       url = new URL(href, conf.base).href;
@@ -75,26 +89,38 @@ function parse(html, conf) {
     if (!conf.linkRe.test(url)) continue;
     if (seen.has(url)) continue;
 
-    const imgTag = inner.match(/<img[^>]+>/i);
-    const image = extractImg(imgTag ? imgTag[0] : "", conf.base);
     let title = "";
-    if (imgTag) {
-      const alt = imgTag[0].match(/alt=["']([^"']+)["']/i);
-      if (alt) title = clean(alt[1]);
+    // 画像のalt属性にタイトルが入っていることが多い
+    if (conf.preferAlt) {
+      const img = m[2].match(/<img[^>]+alt=["']([^"']+)["']/i);
+      if (img) title = clean(img[1]);
     }
-    if (!title) title = clean(inner);
-    if (!title || title.length < 6) continue;
+    if (!title) title = clean(m[2]);
+    if (!title || looksLikeJunk(title)) continue;
+
+    // 先頭のカテゴリ表記を除去
+    if (conf.stripCats) {
+      for (const c of conf.stripCats) {
+        if (title.startsWith(c)) {
+          title = title.slice(c.length).trim();
+          break;
+        }
+      }
+    }
+    if (title.length < 6) continue;
 
     seen.add(url);
-    items.push({ title, link: url, image });
+    items.push({ title, link: url });
+    if (items.length >= conf.limit) break;
   }
-  return items.slice(0, conf.limit);
+  return items;
 }
 
 export async function onRequest(context) {
   const reqUrl = new URL(context.request.url);
   const src = reqUrl.searchParams.get("src");
   const debugOn = reqUrl.searchParams.get("debug");
+  const rawOn = reqUrl.searchParams.get("raw");
   const conf = SOURCES[src];
 
   if (!conf) {
@@ -118,6 +144,20 @@ export async function onRequest(context) {
     if (!res.ok) throw new Error("status " + res.status);
     const html = await res.text();
     debug.htmlLength = html.length;
+
+    // 調整用：対象セクション周辺のHTMLを返す
+    if (rawOn) {
+      let snippet = html;
+      if (conf.sectionStart) {
+        const si = html.indexOf(conf.sectionStart);
+        if (si >= 0) snippet = html.slice(si, si + 4000);
+      } else {
+        snippet = html.slice(0, 4000);
+      }
+      return new Response(snippet, {
+        headers: { "Content-Type": "text/plain; charset=utf-8" },
+      });
+    }
 
     const items = parse(html, conf);
     debug.count = items.length;
