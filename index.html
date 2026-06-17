@@ -69,18 +69,23 @@
         </div>
       </section>
 
+      <!-- MLBドジャース速報（実データ・横一行のストリップ） -->
+      <section class="mlb" aria-label="MLBドジャース速報">
+        <div class="mlb-head">
+          <h2><span class="icon">⚾</span> MLBドジャース速報</h2>
+          <span class="mlb-summary" id="mlb-summary"></span>
+        </div>
+        <div class="mlb-track" id="mlb-track">
+          <div class="strip-loading">成績を読み込み中…</div>
+        </div>
+      </section>
+
       <!-- カードを並べるエリア。中身は script.js が組み立てます -->
       <section class="grid">
         <!-- EDINET / 上場REIT物件取引チェック -->
         <article class="card">
           <div class="card-header"><span class="icon">🏢</span><h2>EDINET / REIT物件取引</h2></div>
           <div class="card-body" id="disclosure-card"></div>
-        </article>
-
-        <!-- MLBドジャース速報 -->
-        <article class="card mlb-card">
-          <div class="card-header"><span class="icon">⚾</span><h2>MLBドジャース速報</h2></div>
-          <div class="card-body" id="dodgers-card"></div>
         </article>
       </section>
 

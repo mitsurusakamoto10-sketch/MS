@@ -400,75 +400,91 @@ function renderDisclosures() {
     "</ul>";
 }
 
-// MLBドジャース（実データ：成績・結果・予定）
+// MLBドジャース（実データ：成績・結果・予定／横一行で表示）
 async function loadMLB() {
-  const el = document.getElementById("dodgers-card");
-  if (!el) return;
+  const track = document.getElementById("mlb-track");
+  if (!track) return;
   try {
     const res = await fetch("/api/mlb", { cache: "no-store" });
     if (!res.ok) throw new Error("status " + res.status);
     const data = await res.json();
-    renderMLB(el, data);
+    renderMLB(data);
   } catch (e) {
-    el.innerHTML =
+    track.innerHTML =
       '<div class="strip-loading">成績を取得できませんでした（あとで再取得します）。</div>';
   }
 }
 
-function renderMLB(el, data) {
+function renderMLB(data) {
+  const track = document.getElementById("mlb-track");
+  const sumEl = document.getElementById("mlb-summary");
   const games = data.games || [];
 
-  // 結果（直近5試合）と予定（今後5試合）に分ける
-  const finished = games.filter((g) => g.state === "Final" || g.state === "Live");
-  const upcoming = games.filter((g) => g.state === "Preview");
-  const recent = finished.slice(-5).reverse();
-  const next = upcoming.slice(0, 5);
+  const now = new Date();
+  const todayMD = now.getMonth() + 1 + "/" + now.getDate();
 
-  const summary =
-    '<div class="dodgers-summary">' +
-    '<span class="dodgers-record">' +
-    esc(data.record || "—") +
-    "</span>" +
-    '<span class="dodgers-rank">' +
-    esc(data.rank || "") +
-    (data.streak ? "・" + esc(data.streak) : "") +
-    "</span></div>";
+  // サマリー（成績）＋本日の試合結果
+  let summary = data.record || "—";
+  if (data.rank) summary += " ・ " + data.rank;
+  if (data.streak) summary += " ・ " + data.streak;
+  const todayGame = games.find((g) => g.date === todayMD);
+  if (todayGame) {
+    const vs = (todayGame.isHome ? "vs " : "＠") + todayGame.opponent;
+    let tg = "本日 " + vs;
+    if (todayGame.status === "勝" || todayGame.status === "負") {
+      tg += " " + todayGame.status + " " + todayGame.score;
+    } else if (todayGame.status === "試合中") {
+      tg += " 試合中 " + todayGame.score;
+    } else {
+      tg += " 予定";
+    }
+    summary += " ｜ " + tg;
+  } else {
+    summary += " ｜ 本日の試合はありません";
+  }
+  if (sumEl) sumEl.textContent = summary;
 
-  el.innerHTML =
-    summary +
-    (recent.length
-      ? '<div class="mlb-subtitle">直近の試合</div>' +
-        '<ul class="game-list">' +
-        recent.map(gameRow).join("") +
-        "</ul>"
-      : "") +
-    (next.length
-      ? '<div class="mlb-subtitle">今後の予定</div>' +
-        '<ul class="game-list">' +
-        next.map(gameRow).join("") +
-        "</ul>"
-      : "");
+  if (!games.length) {
+    track.innerHTML = '<div class="strip-loading">試合情報がありません。</div>';
+    return;
+  }
+
+  track.innerHTML = games.map((g) => mlbCell(g, todayMD)).join("");
+
+  // 本日のコマが見える位置へスクロール
+  const todayCell = track.querySelector(".mlb-cell.today");
+  if (todayCell) track.scrollLeft = Math.max(0, todayCell.offsetLeft - 12);
 }
 
-function gameRow(g) {
+function mlbCell(g, todayMD) {
   let badgeClass = "result-upcoming";
   if (g.status === "勝") badgeClass = "result-win";
   else if (g.status === "負") badgeClass = "result-lose";
   else if (g.status === "試合中") badgeClass = "result-live";
 
-  const vs = (g.isHome ? "vs " : "＠") + esc(g.opponent);
+  const opp = (g.isHome ? "vs " : "＠") + esc(g.opponent);
+  const today = g.date === todayMD ? " today" : "";
+  const score = g.score ? '<div class="mlb-cell-score">' + esc(g.score) + "</div>" : "";
+
   return (
-    '<li class="game-item">' +
-    '<a class="game-link" href="' +
+    '<a class="mlb-cell' +
+    today +
+    '" href="' +
     escAttr(g.link) +
     '" target="_blank" rel="noopener">' +
-    '<span class="result-badge ' + badgeClass + '">' +
+    '<div class="mlb-cell-date">' +
+    esc(g.date) +
+    "</div>" +
+    '<div class="mlb-cell-opp">' +
+    opp +
+    "</div>" +
+    '<div class="mlb-cell-badge ' +
+    badgeClass +
+    '">' +
     esc(g.status) +
-    "</span>" +
-    '<span class="game-team">' + vs + "</span>" +
-    (g.score ? '<span class="game-score">' + esc(g.score) + "</span>" : "") +
-    '<span class="game-date">' + esc(g.date) + " ›</span>" +
-    "</a></li>"
+    "</div>" +
+    score +
+    "</a>"
   );
 }
 
