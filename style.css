@@ -369,6 +369,39 @@ body {
   background: var(--accent-soft);
 }
 
+/* REIT開示の1行（日付 + 題名） */
+.reit-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  text-decoration: none;
+  color: var(--text);
+  transition: background 0.12s;
+}
+.reit-row:first-child {
+  border-top: none;
+}
+.reit-row:hover {
+  background: var(--accent-soft);
+}
+.reit-date {
+  flex: 0 0 auto;
+  width: 40px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.reit-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.82rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* ---- 共通：日付付きリスト（REIT） ---- */
 .list-divided {
   list-style: none;

@@ -6,15 +6,6 @@
 // このファイルの値を書き換えると、画面の表示も変わります。
 // ============================================================
 
-// ---- サンプルデータ ----------------------------------------
-
-// EDINET / 上場REIT物件取引（架空の開示）
-const disclosures = [
-  { reit: "サンプル総合リート投資法人", type: "取得", property: "（仮称）サンプルオフィス東京", amount: "12,000百万円", date: "2026/06/16" },
-  { reit: "テスト物流リート投資法人", type: "譲渡", property: "ダミー物流センター千葉", amount: "3,500百万円", date: "2026/06/12" },
-  { reit: "ダミー住宅リート投資法人", type: "取得", property: "サンプルレジデンス横浜", amount: "2,100百万円", date: "2026/06/10" },
-];
-
 // ---- 表示を組み立てる関数 ----------------------------------
 
 // 0. 最上部バーの時計：本日の日付 + 現在時刻を毎秒更新
@@ -373,31 +364,45 @@ function escAttr(str) {
   return esc(str).replace(/"/g, "&quot;");
 }
 
-// 開示（REIT）
-function renderDisclosures() {
+// 上場REIT開示（EDINET・直近10日・題名のみ）
+async function loadREIT() {
   const el = document.getElementById("disclosure-card");
-  el.innerHTML =
-    '<ul class="disclosure-list">' +
-    disclosures
-      .map((d) => {
-        const tagClass = d.type === "取得" ? "tag-acquire" : "tag-transfer";
-        return (
-          "<li>" +
-          '<div class="row-top"><span class="tag ' + tagClass + '">' +
-          esc(d.type) +
-          '</span><span class="date">' +
-          esc(d.date) +
-          "</span></div>" +
-          '<div class="title-line">' +
-          esc(d.property) +
-          "</div>" +
-          '<div class="sub-line">' +
-          esc(d.reit) + "・" + esc(d.amount) +
-          "</div></li>"
-        );
-      })
-      .join("") +
-    "</ul>";
+  if (!el) return;
+  try {
+    const res = await fetch("/api/reit", { cache: "no-store" });
+    if (!res.ok) throw new Error("status " + res.status);
+    const data = await res.json();
+    if (data.error === "no_api_key") {
+      el.innerHTML =
+        '<div class="strip-loading">EDINET APIキーが未設定です（Cloudflareの環境変数 EDINET_API_KEY を設定してください）。</div>';
+      return;
+    }
+    if (!data.items || data.items.length === 0) {
+      el.innerHTML =
+        '<div class="strip-loading">直近10日の開示はありませんでした。</div>';
+      return;
+    }
+    el.innerHTML =
+      '<div class="feed-list">' + data.items.map(reitRow).join("") + "</div>";
+  } catch (e) {
+    el.innerHTML =
+      '<div class="strip-loading">開示情報を取得できませんでした（あとで再取得します）。</div>';
+  }
+}
+
+function reitRow(it) {
+  return (
+    '<a class="reit-row" href="' +
+    escAttr(it.link) +
+    '" target="_blank" rel="noopener">' +
+    '<span class="reit-date">' +
+    esc(it.date) +
+    "</span>" +
+    '<span class="reit-title">' +
+    esc(it.title) +
+    "</span>" +
+    "</a>"
+  );
 }
 
 // MLBドジャース（実データ：成績・結果・予定／横一行で表示）
@@ -507,5 +512,19 @@ document.addEventListener("DOMContentLoaded", () => {
     loadThumbs("newspicks", "picks-grid");
   }, 30 * 60 * 1000);
 
-  renderDisclosures();
+  // 上場REIT開示(EDINET)：初回取得 + 毎朝8時に更新
+  loadREIT();
+  scheduleDailyAt8(loadREIT);
 });
+
+// 毎朝8時(ローカル時刻)に関数を実行する
+function scheduleDailyAt8(fn) {
+  const now = new Date();
+  const next = new Date(now);
+  next.setHours(8, 0, 0, 0);
+  if (next <= now) next.setDate(next.getDate() + 1);
+  setTimeout(() => {
+    fn();
+    setInterval(fn, 24 * 60 * 60 * 1000);
+  }, next - now);
+}
