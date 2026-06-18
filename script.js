@@ -422,43 +422,44 @@ async function loadMLB() {
 
 function renderMLB(data) {
   const track = document.getElementById("mlb-track");
-  const sumEl = document.getElementById("mlb-summary");
+  if (!track) return;
   const games = data.games || [];
 
   const now = new Date();
   const todayMD = now.getMonth() + 1 + "/" + now.getDate();
 
-  // サマリー（成績）＋本日の試合結果
-  let summary = data.record || "—";
-  if (data.rank) summary += " ・ " + data.rank;
-  if (data.streak) summary += " ・ " + data.streak;
+  // 先頭の概要セル（成績＋本日の結果）
+  let todayLine = "本日なし";
   const todayGame = games.find((g) => g.date === todayMD);
   if (todayGame) {
-    const vs = (todayGame.isHome ? "vs " : "＠") + todayGame.opponent;
-    let tg = "本日 " + vs;
     if (todayGame.status === "勝" || todayGame.status === "負") {
-      tg += " " + todayGame.status + " " + todayGame.score;
+      todayLine = "本日 " + todayGame.status + " " + todayGame.score;
     } else if (todayGame.status === "試合中") {
-      tg += " 試合中 " + todayGame.score;
+      todayLine = "本日 試合中";
     } else {
-      tg += " 予定";
+      todayLine = "本日 予定";
     }
-    summary += " ｜ " + tg;
-  } else {
-    summary += " ｜ 本日の試合はありません";
   }
-  if (sumEl) sumEl.textContent = summary;
+  const sumCell =
+    '<div class="mlb-cell mlb-sum">' +
+    '<div class="mlb-sum-title">⚾ ドジャース</div>' +
+    '<div class="mlb-sum-rec">' +
+    esc(data.record || "—") +
+    "</div>" +
+    '<div class="mlb-sum-today">' +
+    esc(todayLine) +
+    "</div>" +
+    "</div>";
 
   if (!games.length) {
-    track.innerHTML = '<div class="strip-loading">試合情報がありません。</div>';
+    track.innerHTML = sumCell;
     return;
   }
 
-  track.innerHTML = games.map((g) => mlbCell(g, todayMD)).join("");
-
-  // 本日のコマが見える位置へスクロール
-  const todayCell = track.querySelector(".mlb-cell.today");
-  if (todayCell) track.scrollLeft = Math.max(0, todayCell.offsetLeft - 12);
+  // 新しい順（本日→過去）に並べて表示
+  const ordered = games.slice().sort((a, b) => (b.ts || 0) - (a.ts || 0));
+  track.innerHTML = sumCell + ordered.map((g) => mlbCell(g, todayMD)).join("");
+  track.scrollLeft = 0;
 }
 
 function mlbCell(g, todayMD) {
@@ -469,7 +470,6 @@ function mlbCell(g, todayMD) {
 
   const opp = (g.isHome ? "vs " : "＠") + esc(g.opponent);
   const today = g.date === todayMD ? " today" : "";
-  const score = g.score ? '<div class="mlb-cell-score">' + esc(g.score) + "</div>" : "";
 
   return (
     '<a class="mlb-cell' +
@@ -483,12 +483,14 @@ function mlbCell(g, todayMD) {
     '<div class="mlb-cell-opp">' +
     opp +
     "</div>" +
-    '<div class="mlb-cell-badge ' +
+    '<div class="mlb-cell-sl">' +
+    '<span class="mlb-badge ' +
     badgeClass +
     '">' +
     esc(g.status) +
+    "</span>" +
+    (g.score ? '<span class="mlb-cell-score">' + esc(g.score) + "</span>" : "") +
     "</div>" +
-    score +
     "</a>"
   );
 }

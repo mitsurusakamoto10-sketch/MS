@@ -32,6 +32,7 @@
   --cool: #7c8a96;        /* 最低気温（ミュートブルーグレー） */
   --up: #6f8a5a;          /* 株価：上昇（ウォームグリーン） */
   --down: #b5443a;        /* 株価：下落（ウォームレッド） */
+  --strip-h: 84px;        /* 株価バー等の共通の高さ */
 }
 
 body {
@@ -125,7 +126,10 @@ body {
 .ticker {
   display: flex;
   gap: 4px;
+  align-items: center;
+  height: var(--strip-h);
   overflow-x: auto;
+  overflow-y: hidden;
   padding: 8px 10px;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -184,6 +188,14 @@ body {
   flex: 1 1 0; /* 幅の比率 1 */
   min-width: 0;
   margin-top: 0;
+}
+/* 広い画面では株価バーと同じ高さに揃える */
+@media (min-width: 761px) {
+  .top-row > .weather-strip,
+  .top-row > .mlb {
+    height: var(--strip-h);
+    overflow: hidden;
+  }
 }
 @media (max-width: 760px) {
   .top-row {
@@ -483,54 +495,59 @@ body {
   color: var(--text-sub);
 }
 
-/* ---- MLBドジャース（横一行のストリップ） ---- */
+/* ---- MLBドジャース（株価バーと同じ高さのスリム表示） ---- */
 .mlb {
   margin-top: 24px;
-}
-.mlb-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 8px;
-}
-.mlb-head h2 {
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--text);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.mlb-summary {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--accent-strong);
 }
 .mlb-track {
   display: flex;
   gap: 6px;
+  height: var(--strip-h);
+  align-items: stretch;
   overflow-x: auto;
-  padding: 8px;
+  overflow-y: hidden;
+  padding: 6px 8px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 14px;
   box-shadow: 0 1px 2px rgba(31, 30, 28, 0.04);
   -webkit-overflow-scrolling: touch;
 }
+/* 先頭の概要セル */
+.mlb-sum {
+  background: var(--accent-soft) !important;
+  justify-content: center !important;
+  min-width: 92px;
+}
+.mlb-sum-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--accent-strong);
+}
+.mlb-sum-rec {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.mlb-sum-today {
+  font-size: 0.68rem;
+  color: var(--text-sub);
+}
+/* 試合コマ（3行で高さに収める） */
 .mlb-cell {
   flex: 0 0 auto;
-  width: 86px;
+  width: 74px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
-  padding: 8px 4px;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px;
   border-radius: 10px;
   background: var(--bg);
   text-decoration: none;
   color: var(--text);
+  overflow: hidden;
   transition: outline 0.12s;
 }
 .mlb-cell:hover {
@@ -541,33 +558,36 @@ body {
   outline: 1px solid var(--accent);
 }
 .mlb-cell-date {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   color: var(--text-sub);
 }
 .mlb-cell-opp {
-  font-size: 0.72rem;
-  text-align: center;
-  line-height: 1.2;
-  min-height: 1.8em;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.mlb-cell-badge {
-  min-width: 20px;
-  height: 20px;
-  padding: 0 6px;
-  border-radius: 10px;
-  color: #fff;
   font-size: 0.7rem;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.mlb-cell-sl {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.mlb-badge {
+  min-width: 18px;
+  height: 17px;
+  padding: 0 5px;
+  border-radius: 9px;
+  color: #fff;
+  font-size: 0.66rem;
   font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .mlb-cell-score {
-  font-size: 0.82rem;
+  font-size: 0.76rem;
   font-weight: 700;
   color: var(--text);
 }
