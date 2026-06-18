@@ -361,7 +361,7 @@ async function loadRelease() {
     const data = await res.json();
     if (data.error === "no_api_key") {
       el.innerHTML =
-        '<div class="strip-loading">AI調査用のAPIキーが未設定です（Cloudflareの環境変数 ANTHROPIC_API_KEY を設定してください）。</div>';
+        '<div class="strip-loading">AI調査用のAPIキーが未設定です（Cloudflareの環境変数 GEMINI_API_KEY を設定してください）。</div>';
       return;
     }
     if (!data.items || data.items.length === 0) {
