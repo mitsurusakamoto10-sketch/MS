@@ -351,7 +351,7 @@ function feedRow(it) {
   );
 }
 
-// 業界リリース情報（AI調べ：Claude + Web検索／毎朝8時更新）
+// 業界リリース情報（AI調べ：Gemini + Web検索／毎朝8時更新）
 async function loadRelease() {
   const el = document.getElementById("release-grid");
   if (!el) return;
