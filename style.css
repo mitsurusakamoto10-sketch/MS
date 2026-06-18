@@ -404,6 +404,43 @@ body {
   background: var(--accent-soft);
 }
 
+/* セル見出しの補足ラベル（例：毎朝8時更新） */
+.thumb-note {
+  font-size: 0.72rem;
+  color: var(--text-sub);
+}
+
+/* 業界リリース情報（AI調べ）：見出し + 要点の1行 */
+.release-row {
+  display: block;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+  text-decoration: none;
+  color: var(--text);
+  transition: background 0.12s;
+}
+.release-row:first-child {
+  border-top: none;
+}
+.release-row:hover {
+  background: var(--accent-soft);
+}
+.release-title {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.release-summary {
+  display: block;
+  margin-top: 3px;
+  font-size: 0.76rem;
+  color: var(--text-sub);
+  line-height: 1.4;
+}
+
 /* REIT開示の1行（日付 + 題名） */
 .reit-row {
   display: flex;
