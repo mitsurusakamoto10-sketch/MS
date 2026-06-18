@@ -168,6 +168,25 @@ body {
   color: var(--text-muted);
 }
 
+/* ---- 天気(左半分) と MLB(右半分) の横並び ---- */
+.top-row {
+  display: flex;
+  gap: 16px;
+  margin-top: 12px;
+  align-items: flex-start;
+}
+.top-row > .weather-strip,
+.top-row > .mlb {
+  flex: 1 1 0;
+  min-width: 0; /* 中の横スクロールを正しく効かせる */
+  margin-top: 0;
+}
+@media (max-width: 760px) {
+  .top-row {
+    flex-direction: column;
+  }
+}
+
 /* ---- 天気予報（簡易表示 + 都道府県ダイヤル） ---- */
 .weather-strip {
   margin-top: 12px;
