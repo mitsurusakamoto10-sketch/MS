@@ -10,14 +10,12 @@
 
 const SOURCES = {
   nfm: {
-    url: "https://nfm.nikkeibp.co.jp/",
+    url: "https://nfm.nikkeibp.co.jp/?bn=bn_news&M=30",
     base: "https://nfm.nikkeibp.co.jp",
     linkRe: /\/atcl\//i,
-    limit: 6,
-    // 「新着記事」セクションだけを対象にする
-    sectionStart: "新着記事",
-    sectionEnd: "お知らせ",
+    limit: 12,
     preferAlt: true,
+    todayOnly: true, // 当日更新分のみ
     // 先頭に付くカテゴリ表記を除去
     stripCats: [
       "売買・開発",
@@ -74,6 +72,12 @@ function parse(html, conf) {
     }
   }
 
+  // 当日（JST）の年月日
+  const jst = new Date(Date.now() + 9 * 3600000);
+  const ty = jst.getUTCFullYear();
+  const tm = jst.getUTCMonth() + 1;
+  const td = jst.getUTCDate();
+
   const items = [];
   const seen = new Set();
   const anchorRe = /<a\b[^>]*href=["']([^"'#]+)["'][^>]*>([\s\S]*?)<\/a>/gi;
@@ -88,6 +92,14 @@ function parse(html, conf) {
     }
     if (!conf.linkRe.test(url)) continue;
     if (seen.has(url)) continue;
+
+    // 当日のみ：リンク周辺に「本日の日付」があるかを確認
+    if (conf.todayOnly) {
+      const ctx = region.slice(Math.max(0, m.index - 220), m.index + m[0].length + 80);
+      const dm = ctx.match(/(20\d{2})[.\/\-](\d{1,2})[.\/\-](\d{1,2})/);
+      if (!dm) continue;
+      if (+dm[1] !== ty || +dm[2] !== tm || +dm[3] !== td) continue;
+    }
 
     let title = "";
     // 画像のalt属性にタイトルが入っていることが多い
