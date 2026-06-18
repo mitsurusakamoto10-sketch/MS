@@ -173,12 +173,16 @@ body {
   display: flex;
   gap: 16px;
   margin-top: 12px;
-  align-items: flex-start;
+  align-items: stretch; /* 高さを揃える */
 }
-.top-row > .weather-strip,
+.top-row > .weather-strip {
+  flex: 2 1 0; /* 幅の比率 2 */
+  min-width: 0;
+  margin-top: 0;
+}
 .top-row > .mlb {
-  flex: 1 1 0;
-  min-width: 0; /* 中の横スクロールを正しく効かせる */
+  flex: 1 1 0; /* 幅の比率 1 */
+  min-width: 0;
   margin-top: 0;
 }
 @media (max-width: 760px) {
