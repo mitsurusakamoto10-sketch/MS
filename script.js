@@ -351,6 +351,47 @@ function feedRow(it) {
   );
 }
 
+// 業界リリース情報（AI調べ：Claude + Web検索／毎朝8時更新）
+async function loadRelease() {
+  const el = document.getElementById("release-grid");
+  if (!el) return;
+  try {
+    const res = await fetch("/api/release", { cache: "no-store" });
+    if (!res.ok) throw new Error("status " + res.status);
+    const data = await res.json();
+    if (data.error === "no_api_key") {
+      el.innerHTML =
+        '<div class="strip-loading">AI調査用のAPIキーが未設定です（Cloudflareの環境変数 GEMINI_API_KEY を設定してください）。</div>';
+      return;
+    }
+    if (!data.items || data.items.length === 0) {
+      el.innerHTML =
+        '<div class="strip-loading">直近24時間の該当ニュースは見つかりませんでした（次回更新で再取得します）。</div>';
+      return;
+    }
+    el.innerHTML = data.items.map(releaseRow).join("");
+  } catch (e) {
+    el.innerHTML =
+      '<div class="strip-loading">情報を取得できませんでした（あとで再取得します）。</div>';
+  }
+}
+
+// 1行＝1ニュース（見出しリンク + 要点）
+function releaseRow(it) {
+  return (
+    '<a class="release-row" href="' +
+    escAttr(it.link) +
+    '" target="_blank" rel="noopener">' +
+    '<span class="release-title">' +
+    esc(it.title) +
+    "</span>" +
+    (it.summary
+      ? '<span class="release-summary">' + esc(it.summary) + "</span>"
+      : "") +
+    "</a>"
+  );
+}
+
 // HTMLに使う文字をエスケープ（記号がそのまま表示されるようにする）
 function esc(str) {
   return String(str)
@@ -517,6 +558,10 @@ document.addEventListener("DOMContentLoaded", () => {
   // 上場REIT開示(EDINET)：初回取得 + 毎朝8時に更新
   loadREIT();
   scheduleDailyAt8(loadREIT);
+
+  // 業界リリース情報（AI調べ）：初回取得 + 毎朝8時に更新
+  loadRelease();
+  scheduleDailyAt8(loadRelease);
 });
 
 // 毎朝8時(ローカル時刻)に関数を実行する
