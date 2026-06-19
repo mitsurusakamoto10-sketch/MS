@@ -127,7 +127,7 @@ body {
   display: flex;
   align-items: center;
   flex-wrap: nowrap;        /* 折り返さず1行 */
-  gap: 8px;
+  gap: 5px;
   margin-bottom: 12px;
   overflow-x: auto;         /* はみ出したら横スクロール */
   -webkit-overflow-scrolling: touch;
@@ -151,12 +151,12 @@ body {
 .company-link {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 6px 11px;
-  border-radius: 12px;
+  gap: 5px;
+  padding: 4px 8px;
+  border-radius: 10px;
   border: 1px solid var(--border);
   background: var(--surface);
-  font-size: 0.8rem;
+  font-size: 0.72rem;
   font-weight: 600;
   color: var(--text);
   text-decoration: none;
@@ -170,9 +170,9 @@ body {
   transform: translateY(-1px);
 }
 .company-link img {
-  width: 20px;
-  height: 20px;
-  border-radius: 4px;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
   display: block;
   flex: none;
 }
