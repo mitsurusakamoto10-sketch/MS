@@ -30,6 +30,25 @@ function secondsUntilNext8amJST() {
 
 export async function onRequest(context) {
   const key = context.env && context.env.EDINET_API_KEY;
+
+  // 診断用: /api/reit?debug=1 でキーの「有無と長さ」だけ返す（値は返さない）
+  if (new URL(context.request.url).searchParams.get("debug") === "1") {
+    return new Response(
+      JSON.stringify({
+        hasKey: !!key,
+        keyLength: key ? String(key).length : 0,
+      }),
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          "Cache-Control": "no-store",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
   if (!key) {
     return new Response(
       JSON.stringify({ items: [], error: "no_api_key" }),
