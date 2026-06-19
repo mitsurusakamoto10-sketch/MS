@@ -122,6 +122,49 @@ body {
   display: block;
 }
 
+/* ---- 大手デベロッパー リリースリンク（ロゴ付きチップ・独立行） ---- */
+.company-links {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.company-links-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-sub);
+  padding-right: 2px;
+}
+.company-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 11px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+}
+.company-link:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  transform: translateY(-1px);
+}
+.company-link img {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  display: block;
+  flex: none;
+}
+
 /* ---- 株価バー（最上部・横スクロール対応） ---- */
 .ticker {
   display: flex;
