@@ -131,13 +131,15 @@
         </div>
       </section>
 
-      <!-- カードを並べるエリア。中身は script.js が組み立てます -->
-      <section class="grid">
-        <!-- 上場REIT 開示情報（EDINET・直近10日） -->
-        <article class="card">
-          <div class="card-header"><span class="icon">🏢</span><h2>上場REIT 開示情報（EDINET・直近10日）</h2></div>
-          <div class="card-body" id="disclosure-card"></div>
-        </article>
+      <!-- 上場REIT 開示情報（EDINET・直近10日／他フィードと同じ全幅・1行表示） -->
+      <section class="thumb-section" aria-label="上場REIT 開示情報（EDINET）">
+        <div class="thumb-head">
+          <h2>上場REIT 開示情報（EDINET・直近10日）</h2>
+          <a href="https://disclosure2.edinet-fsa.go.jp/" target="_blank" rel="noopener">EDINETを開く ›</a>
+        </div>
+        <div class="feed-list" id="disclosure-card">
+          <div class="strip-loading">読み込み中…</div>
+        </div>
       </section>
 
       <footer class="page-footer">
