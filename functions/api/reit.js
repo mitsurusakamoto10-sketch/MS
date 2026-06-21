@@ -33,10 +33,19 @@ export async function onRequest(context) {
 
   // 診断用: /api/reit?debug=1 でキーの「有無と長さ」だけ返す（値は返さない）
   if (new URL(context.request.url).searchParams.get("debug") === "1") {
+    // バインドされている環境変数の「名前と文字数」だけを列挙（値は出さない）
+    const envNames = {};
+    try {
+      for (const k of Object.keys(context.env || {})) {
+        const v = context.env[k];
+        envNames[k] = typeof v === "string" ? v.length : typeof v;
+      }
+    } catch (e) {}
     return new Response(
       JSON.stringify({
         hasKey: !!key,
         keyLength: key ? String(key).length : 0,
+        envVars: envNames,
       }),
       {
         status: 200,
