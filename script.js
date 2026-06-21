@@ -420,7 +420,7 @@ async function loadREIT() {
     }
     if (!data.items || data.items.length === 0) {
       el.innerHTML =
-        '<div class="strip-loading">直近10日の開示はありませんでした。</div>';
+        '<div class="strip-loading">直近10日に、物件の取得・売却・賃貸借に関する開示はありませんでした。</div>';
       return;
     }
     el.innerHTML =

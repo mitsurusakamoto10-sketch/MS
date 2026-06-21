@@ -2,14 +2,17 @@
 // 上場REIT(投資法人)の開示書類一覧 Function（EDINET API v2）
 // ------------------------------------------------------------
 // EDINET API から直近10日間の提出書類を取得し、提出者名に
-// 「投資法人」を含むもの（=上場REIT等）の題名のみを返します。
+// 「投資法人」を含むもの（=上場REIT等）のうち、
+// 「物件の取得・売却・賃貸借」に関する開示の題名のみを返します。
+// （題名 docDescription が PROPERTY_KEYWORDS のいずれかを含むもの）
 //
 // 呼び出し: GET /api/reit
 //
 // ※EDINET API v2 はAPIキー(Subscription-Key)が必須です。
 //   Cloudflare Pages の環境変数 EDINET_API_KEY に設定してください。
 // ※EDINETは「法定開示書類(有報・臨時報告書等)」が対象で、
-//   物件取得などの「適時開示(TDnet)」とは異なります。
+//   物件取得などの詳細は「適時開示(TDnet)」が中心です。EDINETの
+//   題名に取引種別が現れないことも多く、該当件数は少なめになります。
 // ============================================================
 
 function pad(n) {
@@ -17,6 +20,24 @@ function pad(n) {
 }
 function ymd(d) {
   return d.getUTCFullYear() + "-" + pad(d.getUTCMonth() + 1) + "-" + pad(d.getUTCDate());
+}
+
+// 物件の「取得・売却・賃貸借」に関する開示だけを抽出するためのキーワード
+// （題名 docDescription に下記のいずれかを含むものだけを対象にする）
+const PROPERTY_KEYWORDS = [
+  "取得",      // 物件取得
+  "売却",      // 物件売却
+  "譲渡",      // 物件譲渡（売却）
+  "処分",      // 資産の処分（売却）
+  "賃貸借",    // 賃貸借契約
+  "賃貸",      // 賃貸
+  "リース",    // リース
+  "信託受益権", // 不動産信託受益権の取得/譲渡
+];
+
+function isPropertyDeal(desc) {
+  if (!desc) return false;
+  return PROPERTY_KEYWORDS.some((kw) => desc.indexOf(kw) >= 0);
 }
 
 // 翌朝8時(JST)までの秒数（毎朝8時に更新されるようにキャッシュ）
@@ -95,7 +116,9 @@ export async function onRequest(context) {
             (r) =>
               r.filerName &&
               r.filerName.indexOf("投資法人") >= 0 &&
-              r.docDescription
+              r.docDescription &&
+              // 物件の取得・売却・賃貸借に関する開示だけに限定
+              isPropertyDeal(r.docDescription)
           )
           .map((r) => ({
             docID: r.docID,
