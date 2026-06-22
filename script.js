@@ -378,13 +378,14 @@ async function loadRelease(force) {
   }
 }
 
-// 1行＝1ニュース（見出しリンク + 要点）
+// 1行＝1ニュース（見出しリンク + 公開日 + 要点）
 function releaseRow(it) {
   return (
     '<a class="release-row" href="' +
     escAttr(it.link) +
     '" target="_blank" rel="noopener">' +
     '<span class="release-title">' +
+    (it.date ? '<span class="release-date">' + esc(it.date) + "</span>" : "") +
     esc(it.title) +
     "</span>" +
     (it.summary

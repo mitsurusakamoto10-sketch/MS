@@ -532,6 +532,19 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* 公開日バッジ（見出し先頭に表示） */
+.release-date {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 0.7rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  vertical-align: middle;
+}
 .release-summary {
   display: block;
   margin-top: 3px;
