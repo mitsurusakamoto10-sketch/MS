@@ -1,9 +1,10 @@
 /* ============================================================
    マイポータル スタイル
-   カラースキーム：Claude（Anthropic）風
-     - 背景：温かみのあるアイボリー
-     - アクセント：コーラル（テラコッタ）
-     - 文字：落ち着いたウォームグレー
+   カラースキーム：シャープ（クール・高コントラスト）
+     - 背景：クールなライトグレー
+     - カード：純白＋くっきりした枠線
+     - アクセント：鮮明なブルー
+     - 文字：クールなほぼ黒（スレート）
    スマホ→タブレット→PC でカードの列数が自動で変わります。
    ============================================================ */
 
@@ -14,24 +15,24 @@
 }
 
 :root {
-  /* --- Claude カラースキーム（ここを変えると全体の色が変わります） --- */
-  --bg: #f0eee6;          /* 背景：アイボリー */
-  --surface: #fbfaf7;     /* カード背景：ほぼ白の温かみのある色 */
-  --border: #e6e2d6;      /* 枠線：ウォームベージュ */
-  --text: #1f1e1c;        /* 文字（濃い）：ウォームブラック */
-  --text-sub: #6f6c61;    /* 文字（中）：ウォームグレー */
-  --text-muted: #a6a293;  /* 文字（薄い）：日付など */
-  --accent: #d97757;      /* アクセント：Claude コーラル */
-  --accent-strong: #c15f3c; /* 濃いコーラル */
-  --accent-soft: #f6e6df; /* 薄いコーラル（タグ背景など） */
-  /* セマンティックカラーも温かめに調整 */
-  --good: #6f8a5a;        /* 取得・勝ち（落ち着いたグリーン） */
-  --good-soft: #ecefe4;
-  --warn: #b07f3f;        /* 譲渡（落ち着いたアンバー） */
-  --warn-soft: #f4ebda;
-  --cool: #7c8a96;        /* 最低気温（ミュートブルーグレー） */
-  --up: #6f8a5a;          /* 株価：上昇（ウォームグリーン） */
-  --down: #b5443a;        /* 株価：下落（ウォームレッド） */
+  /* --- シャープ カラースキーム（ここを変えると全体の色が変わります） --- */
+  --bg: #eef1f5;          /* 背景：クールなライトグレー */
+  --surface: #ffffff;     /* カード背景：純白 */
+  --border: #d4dae2;      /* 枠線：くっきりしたクールグレー */
+  --text: #0f172a;        /* 文字（濃い）：スレートブラック */
+  --text-sub: #475569;    /* 文字（中）：スレートグレー */
+  --text-muted: #94a3b8;  /* 文字（薄い）：日付など */
+  --accent: #2563eb;      /* アクセント：鮮明なブルー */
+  --accent-strong: #1d4ed8; /* 濃いブルー */
+  --accent-soft: #dbeafe; /* 薄いブルー（タグ背景など） */
+  /* セマンティックカラーも鮮明・高コントラストに */
+  --good: #16a34a;        /* 取得・勝ち（鮮明なグリーン） */
+  --good-soft: #dcfce7;
+  --warn: #d97706;        /* 譲渡（鮮明なアンバー） */
+  --warn-soft: #fef3c7;
+  --cool: #0ea5e9;        /* 最低気温（クールなスカイブルー） */
+  --up: #16a34a;          /* 株価：上昇（グリーン） */
+  --down: #dc2626;        /* 株価：下落（レッド） */
   --strip-h: 84px;        /* 株価バー等の共通の高さ */
 }
 
@@ -105,7 +106,7 @@ body {
   justify-content: center;
   width: 46px;
   height: 46px;
-  border-radius: 12px;
+  border-radius: 8px;
   border: 1px solid var(--border);
   background: var(--surface);
   transition: background 0.15s, border-color 0.15s, transform 0.1s;
@@ -188,8 +189,8 @@ body {
   padding: 8px 10px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
-  box-shadow: 0 1px 2px rgba(31, 30, 28, 0.04);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
   -webkit-overflow-scrolling: touch;
 }
 .ticker-item {
@@ -267,8 +268,8 @@ body {
   padding: 10px 14px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
-  box-shadow: 0 1px 2px rgba(31, 30, 28, 0.04);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
 }
 /* 左側：天気の中身 */
 .wx-now {
@@ -384,8 +385,8 @@ body {
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
-  box-shadow: 0 1px 2px rgba(31, 30, 28, 0.04);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -479,7 +480,7 @@ body {
 .feed-list {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 8px;
   overflow: hidden;
 }
 /* 1行＝1記事（表題のみ） */
@@ -644,8 +645,8 @@ body {
   padding: 6px 8px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
-  box-shadow: 0 1px 2px rgba(31, 30, 28, 0.04);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
   -webkit-overflow-scrolling: touch;
 }
 /* 先頭の概要セル */
