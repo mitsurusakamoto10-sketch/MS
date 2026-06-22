@@ -408,11 +408,13 @@ function escAttr(str) {
 }
 
 // 上場REIT開示（EDINET・直近10日・題名のみ）
-async function loadREIT() {
+async function loadREIT(force) {
   const el = document.getElementById("disclosure-card");
   if (!el) return;
   try {
-    const res = await fetch("/api/reit", { cache: "no-store" });
+    // force=true のときはキャッシュを避け、その時点でEDINETを再取得する
+    const url = force ? "/api/reit?fresh=1&t=" + Date.now() : "/api/reit";
+    const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) throw new Error("status " + res.status);
     const data = await res.json();
     if (data.error === "no_api_key") {
@@ -557,29 +559,34 @@ document.addEventListener("DOMContentLoaded", () => {
     loadThumbs("newspicks", "picks-grid");
   }, 30 * 60 * 1000);
 
-  // 上場REIT開示(EDINET)：初回取得 + 毎朝8時に更新
+  // 上場REIT開示(EDINET)：初回取得 + 毎朝8時に更新 + 手動更新ボタン
   loadREIT();
   scheduleDailyAt8(loadREIT);
+  setupRefreshButton("reit-refresh", "disclosure-card", loadREIT, "EDINETを再取得中…");
 
   // 業界リリース情報（AI調べ）：初回取得 + 毎朝8時に更新 + 手動更新ボタン
   loadRelease();
   scheduleDailyAt8(loadRelease);
-  setupReleaseRefresh();
+  setupRefreshButton(
+    "release-refresh",
+    "release-grid",
+    loadRelease,
+    "AIが調査中…（最大30秒ほどかかります）"
+  );
 });
 
-// 「更新」ボタン：押すとその時点でAIに調べ直させる
-function setupReleaseRefresh() {
-  const btn = document.getElementById("release-refresh");
-  const el = document.getElementById("release-grid");
+// 「更新」ボタン：押すとその時点で loadFn(true) を実行して再取得する
+function setupRefreshButton(btnId, targetId, loadFn, loadingText) {
+  const btn = document.getElementById(btnId);
+  const el = document.getElementById(targetId);
   if (!btn || !el) return;
   btn.addEventListener("click", async () => {
     if (btn.disabled) return;
     btn.disabled = true;
     btn.classList.add("is-loading");
-    el.innerHTML =
-      '<div class="strip-loading">AIが調査中…（最大30秒ほどかかります）</div>';
+    el.innerHTML = '<div class="strip-loading">' + loadingText + "</div>";
     try {
-      await loadRelease(true);
+      await loadFn(true);
     } finally {
       btn.disabled = false;
       btn.classList.remove("is-loading");

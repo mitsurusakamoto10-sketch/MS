@@ -140,7 +140,12 @@
       <section class="thumb-section" aria-label="上場REIT 開示情報（EDINET）">
         <div class="thumb-head">
           <h2>上場REIT 物件取引開示（取得・売却・賃貸借／EDINET・直近10日）</h2>
-          <a href="https://disclosure2.edinet-fsa.go.jp/" target="_blank" rel="noopener">EDINETを開く ›</a>
+          <div class="thumb-head-right">
+            <a href="https://disclosure2.edinet-fsa.go.jp/" target="_blank" rel="noopener">EDINETを開く ›</a>
+            <button type="button" class="refresh-btn" id="reit-refresh" title="今すぐEDINETを再取得する">
+              <span class="refresh-icon" aria-hidden="true">↻</span><span class="refresh-label">更新</span>
+            </button>
+          </div>
         </div>
         <div class="feed-list" id="disclosure-card">
           <div class="strip-loading">読み込み中…</div>
