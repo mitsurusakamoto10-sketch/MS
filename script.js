@@ -352,11 +352,13 @@ function feedRow(it) {
 }
 
 // 業界リリース情報（AI調べ：Gemini + Web検索／毎朝8時更新）
-async function loadRelease() {
+async function loadRelease(force) {
   const el = document.getElementById("release-grid");
   if (!el) return;
   try {
-    const res = await fetch("/api/release", { cache: "no-store" });
+    // force=true のときはキャッシュを避け、その時点でAIに調べ直させる
+    const url = force ? "/api/release?fresh=1&t=" + Date.now() : "/api/release";
+    const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) throw new Error("status " + res.status);
     const data = await res.json();
     if (data.error === "no_api_key") {
@@ -559,10 +561,31 @@ document.addEventListener("DOMContentLoaded", () => {
   loadREIT();
   scheduleDailyAt8(loadREIT);
 
-  // 業界リリース情報（AI調べ）：初回取得 + 毎朝8時に更新
+  // 業界リリース情報（AI調べ）：初回取得 + 毎朝8時に更新 + 手動更新ボタン
   loadRelease();
   scheduleDailyAt8(loadRelease);
+  setupReleaseRefresh();
 });
+
+// 「更新」ボタン：押すとその時点でAIに調べ直させる
+function setupReleaseRefresh() {
+  const btn = document.getElementById("release-refresh");
+  const el = document.getElementById("release-grid");
+  if (!btn || !el) return;
+  btn.addEventListener("click", async () => {
+    if (btn.disabled) return;
+    btn.disabled = true;
+    btn.classList.add("is-loading");
+    el.innerHTML =
+      '<div class="strip-loading">AIが調査中…（最大30秒ほどかかります）</div>';
+    try {
+      await loadRelease(true);
+    } finally {
+      btn.disabled = false;
+      btn.classList.remove("is-loading");
+    }
+  });
+}
 
 // 毎朝8時(ローカル時刻)に関数を実行する
 function scheduleDailyAt8(fn) {

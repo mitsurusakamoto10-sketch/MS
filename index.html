@@ -109,11 +109,16 @@
         </div>
       </section>
 
-      <!-- 業界リリース情報（AI調べ・Gemini + Web検索／毎朝8時更新） -->
+      <!-- 業界リリース情報（AI調べ・Gemini + Web検索／毎朝8時更新 + 手動更新） -->
       <section class="thumb-section" aria-label="業界リリース情報（AI調べ）">
         <div class="thumb-head">
           <h2>業界リリース情報（AI調べ）</h2>
-          <span class="thumb-note">毎朝8時更新・Gemini調べ</span>
+          <div class="thumb-head-right">
+            <span class="thumb-note">毎朝8時更新・Gemini調べ</span>
+            <button type="button" class="refresh-btn" id="release-refresh" title="今すぐAIで調べ直す">
+              <span class="refresh-icon" aria-hidden="true">↻</span><span class="refresh-label">更新</span>
+            </button>
+          </div>
         </div>
         <div class="feed-list" id="release-grid">
           <div class="strip-loading">読み込み中…</div>

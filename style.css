@@ -433,6 +433,49 @@ body {
   color: var(--accent-strong);
   text-decoration: none;
 }
+/* 見出し右側のまとまり（補足ラベル + 更新ボタン） */
+.thumb-head-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+/* 「更新」ボタン（手動でAIに調べ直させる） */
+.refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--accent-strong);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.refresh-btn:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent-strong);
+}
+.refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+.refresh-icon {
+  display: inline-block;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+/* 調査中はアイコンを回転 */
+.refresh-btn.is-loading .refresh-icon {
+  animation: refresh-spin 0.8s linear infinite;
+}
+@keyframes refresh-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 .feed-list {
   background: var(--surface);
   border: 1px solid var(--border);
