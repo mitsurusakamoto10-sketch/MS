@@ -35,7 +35,7 @@ const ARTICLE_RE =
 const TARGET_SLUGS = ["new-hotels", "supply-pipeline", "investment", "development"];
 
 const MAX_CANDIDATES = 30; // Geminiに渡す候補の上限
-const MAX_ITEMS = 6;       // 最終的に表示する件数
+const MAX_ITEMS = 5;       // 最終的に表示する件数
 
 function pad2(n) {
   return n < 10 ? "0" + n : "" + n;
