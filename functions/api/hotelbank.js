@@ -1,33 +1,32 @@
 // ============================================================
-// HotelBank 最新ニュース Function（RSS取得 + Gemini重要度判定）
+// HotelBank 最新ニュース Function（HTML一覧取得 + Gemini重要度判定）
 // ------------------------------------------------------------
-// HotelBank(hotelbank.jp)のRSS/カテゴリフィードから実在記事
+// HotelBank(hotelbank.jp)の記事一覧ページから実在記事
 // （タイトル・URL・公開/更新日時）を集め、「新規開業・供給・
 // 投資・開発」の観点で重要な記事をGeminiに最大6件選ばせて返します。
 // Geminiには実在記事のリストだけを渡し「番号(index)」で選ばせるため、
 // URL・日時は正確なまま（捏造が起きない構成）です。
 //
 // 呼び出し: GET /api/hotelbank
-//   &fresh=... でキャッシュ回避、&debug=1 で診断情報を返します。
+//   &fresh=... でキャッシュ回避、&debug=1 で診断情報、
+//   &raw=1 で取得HTMLの一部を返します（調整用）。
 //
-// ※Gemini失敗時はRSS新着順の6件にフォールバックします。
-//   GEMINI_API_KEY（設定済み）を使用します。
+// ※Gemini失敗時は新着順の6件にフォールバックします。
+//   ※RSS(/feed/)は500/404のため使わず、HTML一覧を解析します。
 // ============================================================
 
 const GEMINI_MODEL = "gemini-2.5-flash";
 
-// 取得するRSSフィード（カテゴリ別 + サイト全体）
-const FEEDS = [
-  "https://hotelbank.jp/new-hotels/feed/",
-  "https://hotelbank.jp/supply-pipeline/feed/",
-  "https://hotelbank.jp/investment/feed/",
-  "https://hotelbank.jp/development/feed/",
-  "https://hotelbank.jp/feed/",
-];
+// 記事一覧の取得元（順に試す）
+const PAGES = ["https://hotelbank.jp/newlist/", "https://hotelbank.jp/"];
+const BASE = "https://hotelbank.jp";
 
-// 対象テーマ（URLスラッグ / カテゴリ名のいずれかに一致すれば採用）
+// 記事URLのパターン（先頭セグメントが対象カテゴリ + 記事スラッグ）
+const ARTICLE_RE =
+  /^https?:\/\/hotelbank\.jp\/(new-hotels|supply-pipeline|investment|development|news)\/[a-z0-9][a-z0-9\-]{3,}\/?$/i;
+
+// 対象テーマ（重要度判定の前段フィルタ：URLスラッグで判定）
 const TARGET_SLUGS = ["new-hotels", "supply-pipeline", "investment", "development"];
-const TARGET_CAT_WORDS = ["開業", "供給", "投資", "開発"];
 
 const MAX_CANDIDATES = 30; // Geminiに渡す候補の上限
 const MAX_ITEMS = 6;       // 最終的に表示する件数
@@ -36,7 +35,6 @@ function pad2(n) {
   return n < 10 ? "0" + n : "" + n;
 }
 
-// 翌朝8時(JST)までの秒数（毎朝8時に更新されるようにキャッシュ）
 function secondsUntilNext8amJST() {
   const nowJst = new Date(Date.now() + 9 * 3600000);
   const next = new Date(nowJst);
@@ -59,62 +57,60 @@ function decodeEntities(s) {
 }
 
 function clean(s) {
-  return decodeEntities(
-    String(s)
-      .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
-      .replace(/<[^>]+>/g, "")
-  )
+  return decodeEntities(String(s).replace(/<[^>]+>/g, ""))
     .replace(/\s+/g, " ")
     .trim();
 }
 
-// <item>...</item> の中から指定タグの中身を取り出す
-function pick(block, tag) {
-  const re = new RegExp("<" + tag + "[^>]*>([\\s\\S]*?)</" + tag + ">", "i");
-  const m = block.match(re);
-  return m ? m[1] : "";
+// 日付パターン（2026.06.20 / 2026-06-20 / 2026年6月20日）を YYYY-MM-DD に
+function findDate(ctx) {
+  let m = ctx.match(/(20\d{2})[.\/\-](\d{1,2})[.\/\-](\d{1,2})/);
+  if (!m) m = ctx.match(/(20\d{2})年\s*(\d{1,2})月\s*(\d{1,2})日/);
+  if (!m) return "";
+  return m[1] + "-" + pad2(+m[2]) + "-" + pad2(+m[3]);
 }
 
-// pubDate(RFC822) などを JST の YYYY-MM-DD に変換
-function toJstYmd(pub) {
-  if (!pub) return "";
-  const t = Date.parse(pub);
-  if (isNaN(t)) return "";
-  const j = new Date(t + 9 * 3600000);
-  return (
-    j.getUTCFullYear() + "-" + pad2(j.getUTCMonth() + 1) + "-" + pad2(j.getUTCDate())
-  );
+function looksLikeJunk(s) {
+  return /[{}]|display\s*:|css-[a-z0-9]|@media|webkit/i.test(s);
 }
 
-// RSS本文から記事を抽出
-function parseRss(xml) {
+// HTMLから記事候補を抽出
+function parsePage(html) {
   const items = [];
-  const itemRe = /<item\b[\s\S]*?<\/item>/gi;
+  const seen = new Set();
+  const anchorRe = /<a\b[^>]*href=["']([^"'#]+)["'][^>]*>([\s\S]*?)<\/a>/gi;
   let m;
-  while ((m = itemRe.exec(xml)) !== null) {
-    const block = m[0];
-    const title = clean(pick(block, "title"));
-    const link = clean(pick(block, "link"));
-    const pub = clean(pick(block, "pubDate")) || clean(pick(block, "dc:date"));
-    if (!title || !link) continue;
-    const cats = [];
-    const catRe = /<category[^>]*>([\s\S]*?)<\/category>/gi;
-    let cm;
-    while ((cm = catRe.exec(block)) !== null) {
-      const c = clean(cm[1]);
-      if (c) cats.push(c);
+  while ((m = anchorRe.exec(html)) !== null) {
+    let url;
+    try {
+      url = new URL(m[1], BASE).href;
+    } catch (e) {
+      continue;
     }
-    items.push({ title, link, date: toJstYmd(pub), ts: Date.parse(pub) || 0, cats });
+    url = url.split("?")[0];
+    if (!ARTICLE_RE.test(url)) continue;
+    if (seen.has(url)) continue;
+
+    // タイトル：画像alt → アンカーテキストの順
+    let title = "";
+    const img = m[2].match(/<img[^>]+alt=["']([^"']+)["']/i);
+    if (img) title = clean(img[1]);
+    if (!title) title = clean(m[2]);
+    if (!title || title.length < 6 || looksLikeJunk(title)) continue;
+
+    // 周辺テキストから日付を探す
+    const ctx = html.slice(Math.max(0, m.index - 260), m.index + m[0].length + 260);
+    const date = findDate(ctx);
+
+    seen.add(url);
+    items.push({ title, link: url, date });
+    if (items.length >= MAX_CANDIDATES) break;
   }
   return items;
 }
 
 function isTarget(it) {
-  const inSlug = TARGET_SLUGS.some((s) => it.link.indexOf("/" + s + "/") >= 0);
-  const inCat = it.cats.some((c) =>
-    TARGET_CAT_WORDS.some((w) => c.indexOf(w) >= 0)
-  );
-  return inSlug || inCat;
+  return TARGET_SLUGS.some((s) => it.link.indexOf("/" + s + "/") >= 0);
 }
 
 function jsonResponse(body, extraHeaders) {
@@ -130,7 +126,6 @@ function jsonResponse(body, extraHeaders) {
   });
 }
 
-// Geminiレスポンスからテキストを結合
 function collectText(data) {
   const parts =
     data &&
@@ -145,7 +140,6 @@ function collectText(data) {
     .join("\n");
 }
 
-// テキストから数値のJSON配列（選ばれたindex）を取り出す
 function extractIndices(text) {
   if (!text) return [];
   const start = text.indexOf("[");
@@ -160,18 +154,9 @@ function extractIndices(text) {
   }
 }
 
-// Geminiに重要度で並べ替え・選定させる（候補のindexを返す）
 async function rankWithGemini(key, candidates) {
   const list = candidates
-    .map(
-      (it, i) =>
-        i +
-        ". [" +
-        (it.date || "日付不明") +
-        "] " +
-        it.title +
-        (it.cats.length ? "（カテゴリ: " + it.cats.join("・") + "）" : "")
-    )
+    .map((it, i) => i + ". [" + (it.date || "日付不明") + "] " + it.title)
     .join("\n");
 
   const prompt = `あなたはホテル業界のアナリストです。以下はHotelBankの最新記事リストです。
@@ -201,47 +186,50 @@ ${list}`;
   return extractIndices(collectText(data));
 }
 
+async function fetchPage(url) {
+  return fetch(url, {
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+      "Accept-Language": "ja,en;q=0.8",
+      Accept: "text/html,application/xhtml+xml",
+    },
+  });
+}
+
 export async function onRequest(context) {
   const reqUrl = new URL(context.request.url);
   const debugOn = reqUrl.searchParams.get("debug");
-  const debug = { feeds: {}, candidateCount: 0, ranked: false, geminiError: null };
+  const rawOn = reqUrl.searchParams.get("raw");
+  const debug = { pages: {}, candidateCount: 0, ranked: false, geminiError: null };
 
   try {
-    // 1) RSSを並行取得して候補を収集
-    const results = await Promise.all(
-      FEEDS.map(async (url) => {
-        try {
-          const res = await fetch(url, {
-            headers: {
-              "User-Agent":
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
-              "Accept-Language": "ja,en;q=0.8",
-              Accept: "application/rss+xml, application/xml, text/xml, */*",
-            },
-          });
-          if (!res.ok) {
-            debug.feeds[url] = "status " + res.status;
-            return [];
-          }
-          const xml = await res.text();
-          const parsed = parseRss(xml);
-          debug.feeds[url] = parsed.length;
-          return parsed;
-        } catch (e) {
-          debug.feeds[url] = "err " + String(e);
-          return [];
+    // 1) 記事一覧ページを順に取得して候補を収集
+    let candidates = [];
+    for (const page of PAGES) {
+      try {
+        const res = await fetchPage(page);
+        if (!res.ok) {
+          debug.pages[page] = "status " + res.status;
+          continue;
         }
-      })
-    );
-
-    // 2) 統合・重複排除・対象テーマに限定・新しい順
-    const byLink = new Map();
-    for (const it of [].concat.apply([], results)) {
-      if (!isTarget(it)) continue;
-      if (!byLink.has(it.link)) byLink.set(it.link, it);
+        const html = await res.text();
+        if (rawOn) {
+          return new Response(html.slice(0, 6000), {
+            headers: { "Content-Type": "text/plain; charset=utf-8" },
+          });
+        }
+        const parsed = parsePage(html).filter(isTarget);
+        debug.pages[page] = { htmlLength: html.length, found: parsed.length };
+        if (parsed.length > 0) {
+          candidates = parsed;
+          break;
+        }
+      } catch (e) {
+        debug.pages[page] = "err " + String(e);
+      }
     }
-    let candidates = Array.from(byLink.values());
-    candidates.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+
     candidates = candidates.slice(0, MAX_CANDIDATES);
     debug.candidateCount = candidates.length;
 
@@ -251,7 +239,7 @@ export async function onRequest(context) {
       return jsonResponse(body);
     }
 
-    // 3) Geminiで重要度判定（失敗時はRSS新着順にフォールバック）
+    // 2) Geminiで重要度判定（失敗時は新着順にフォールバック）
     let chosen = candidates.slice(0, MAX_ITEMS);
     const key = context.env && context.env.GEMINI_API_KEY;
     if (key) {
