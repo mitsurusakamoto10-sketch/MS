@@ -17,8 +17,14 @@
 
 const GEMINI_MODEL = "gemini-2.5-flash";
 
-// 記事一覧の取得元（順に試す）
-const PAGES = ["https://hotelbank.jp/newlist/", "https://hotelbank.jp/"];
+// 記事一覧の取得元（すべて取得して候補を統合）
+const PAGES = [
+  "https://hotelbank.jp/newlist/",
+  "https://hotelbank.jp/new-hotels/",
+  "https://hotelbank.jp/supply-pipeline/",
+  "https://hotelbank.jp/investment/",
+  "https://hotelbank.jp/development/",
+];
 const BASE = "https://hotelbank.jp";
 
 // 記事URLのパターン（先頭セグメントが対象カテゴリ + 記事スラッグ）
@@ -62,9 +68,11 @@ function clean(s) {
     .trim();
 }
 
-// 日付パターン（2026.06.20 / 2026-06-20 / 2026年6月20日）を YYYY-MM-DD に
+// 日付を YYYY-MM-DD で取り出す
+// <time datetime="2026-06-20..."> / 2026.06.20 / 2026-06-20 / 2026年6月20日
 function findDate(ctx) {
-  let m = ctx.match(/(20\d{2})[.\/\-](\d{1,2})[.\/\-](\d{1,2})/);
+  let m = ctx.match(/datetime=["'](20\d{2})-(\d{1,2})-(\d{1,2})/i);
+  if (!m) m = ctx.match(/(20\d{2})[.\/\-](\d{1,2})[.\/\-](\d{1,2})/);
   if (!m) m = ctx.match(/(20\d{2})年\s*(\d{1,2})月\s*(\d{1,2})日/);
   if (!m) return "";
   return m[1] + "-" + pad2(+m[2]) + "-" + pad2(+m[3]);
@@ -98,8 +106,8 @@ function parsePage(html) {
     if (!title) title = clean(m[2]);
     if (!title || title.length < 6 || looksLikeJunk(title)) continue;
 
-    // 周辺テキストから日付を探す
-    const ctx = html.slice(Math.max(0, m.index - 260), m.index + m[0].length + 260);
+    // 周辺テキストから日付を探す（カード構造を広めに見る）
+    const ctx = html.slice(Math.max(0, m.index - 450), m.index + m[0].length + 450);
     const date = findDate(ctx);
 
     seen.add(url);
@@ -204,32 +212,56 @@ export async function onRequest(context) {
   const debug = { pages: {}, candidateCount: 0, ranked: false, geminiError: null };
 
   try {
-    // 1) 記事一覧ページを順に取得して候補を収集
-    let candidates = [];
-    for (const page of PAGES) {
-      try {
-        const res = await fetchPage(page);
-        if (!res.ok) {
-          debug.pages[page] = "status " + res.status;
-          continue;
+    // 1) 全一覧ページを並行取得し、候補を統合（URLで重複排除）
+    const byLink = new Map();
+    const pages = await Promise.all(
+      PAGES.map(async (page) => {
+        try {
+          const res = await fetchPage(page);
+          if (!res.ok) {
+            debug.pages[page] = "status " + res.status;
+            return null;
+          }
+          const html = await res.text();
+          const parsed = parsePage(html).filter(isTarget);
+          debug.pages[page] = { htmlLength: html.length, found: parsed.length };
+          return { page, html, parsed };
+        } catch (e) {
+          debug.pages[page] = "err " + String(e);
+          return null;
         }
-        const html = await res.text();
-        if (rawOn) {
-          return new Response(html.slice(0, 6000), {
-            headers: { "Content-Type": "text/plain; charset=utf-8" },
-          });
+      })
+    );
+
+    // raw=1：最初に取得できたページの、最初の記事リンク周辺HTMLを返す
+    if (rawOn) {
+      const first = pages.find((p) => p && p.html);
+      let snippet = first ? first.html.slice(0, 5000) : "(no html)";
+      if (first) {
+        const mm = first.html.match(
+          /href=["']https?:\/\/hotelbank\.jp\/(?:new-hotels|supply-pipeline|investment|development)\/[a-z0-9\-]{4,}/i
+        );
+        if (mm) {
+          const idx = first.html.indexOf(mm[0]);
+          snippet = first.html.slice(Math.max(0, idx - 1500), idx + 2500);
         }
-        const parsed = parsePage(html).filter(isTarget);
-        debug.pages[page] = { htmlLength: html.length, found: parsed.length };
-        if (parsed.length > 0) {
-          candidates = parsed;
-          break;
-        }
-      } catch (e) {
-        debug.pages[page] = "err " + String(e);
+      }
+      return new Response(snippet, {
+        headers: { "Content-Type": "text/plain; charset=utf-8" },
+      });
+    }
+
+    for (const p of pages) {
+      if (!p) continue;
+      for (const it of p.parsed) {
+        if (!byLink.has(it.link)) byLink.set(it.link, it);
+        else if (!byLink.get(it.link).date && it.date) byLink.get(it.link).date = it.date;
       }
     }
 
+    let candidates = Array.from(byLink.values());
+    // 日付があるものは新しい順、無いものは後ろへ
+    candidates.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
     candidates = candidates.slice(0, MAX_CANDIDATES);
     debug.candidateCount = candidates.length;
 
