@@ -125,6 +125,22 @@
         </div>
       </section>
 
+      <!-- HotelBank 最新ニュース（RSS取得 + Geminiが重要度を判定／毎朝8時更新 + 手動更新） -->
+      <section class="thumb-section" aria-label="HotelBank 最新ニュース">
+        <div class="thumb-head">
+          <h2>🏨 HotelBank 最新ニュース（開業・供給・投資・開発）</h2>
+          <div class="thumb-head-right">
+            <a href="https://hotelbank.jp/newlist/" target="_blank" rel="noopener">HotelBankを開く ›</a>
+            <button type="button" class="refresh-btn" id="hotelbank-refresh" title="今すぐ最新ニュースを取得する">
+              <span class="refresh-icon" aria-hidden="true">↻</span><span class="refresh-label">更新</span>
+            </button>
+          </div>
+        </div>
+        <div class="feed-list" id="hotelbank-grid">
+          <div class="strip-loading">読み込み中…</div>
+        </div>
+      </section>
+
       <!-- NewsPicks 注目（公開ページのサムネイル・TOP5） -->
       <section class="thumb-section" aria-label="NewsPicks 注目">
         <div class="thumb-head">

@@ -395,6 +395,28 @@ function releaseRow(it) {
   );
 }
 
+// HotelBank 最新ニュース（RSS + Geminiが重要度判定／名称 + 公開日）
+async function loadHotelBank(force) {
+  const el = document.getElementById("hotelbank-grid");
+  if (!el) return;
+  try {
+    const url = force ? "/api/hotelbank?fresh=1&t=" + Date.now() : "/api/hotelbank";
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error("status " + res.status);
+    const data = await res.json();
+    if (!data.items || data.items.length === 0) {
+      el.innerHTML =
+        '<div class="strip-loading">最新ニュースを取得できませんでした（あとで再取得します）。</div>';
+      return;
+    }
+    // 名称（タイトル）＋公開日バッジ。要点は無いので releaseRow を流用
+    el.innerHTML = data.items.map(releaseRow).join("");
+  } catch (e) {
+    el.innerHTML =
+      '<div class="strip-loading">最新ニュースを取得できませんでした（あとで再取得します）。</div>';
+  }
+}
+
 // HTMLに使う文字をエスケープ（記号がそのまま表示されるようにする）
 function esc(str) {
   return String(str)
@@ -573,6 +595,16 @@ document.addEventListener("DOMContentLoaded", () => {
     "release-grid",
     loadRelease,
     "AIが調査中…（最大30秒ほどかかります）"
+  );
+
+  // HotelBank 最新ニュース：初回取得 + 毎朝8時に更新 + 手動更新ボタン
+  loadHotelBank();
+  scheduleDailyAt8(loadHotelBank);
+  setupRefreshButton(
+    "hotelbank-refresh",
+    "hotelbank-grid",
+    loadHotelBank,
+    "最新ニュースを取得中…"
   );
 });
 
