@@ -83,32 +83,23 @@ function looksLikeJunk(s) {
 }
 
 // HTMLから記事候補を抽出
+// HotelBankの一覧は <a href="記事URL"></a><h1>タイトル</h1> … <span class="date">…日付</span>
+// という構造（リンクは空・タイトルはh1・日付は後続のspan）。
 function parsePage(html) {
   const items = [];
   const seen = new Set();
-  const anchorRe = /<a\b[^>]*href=["']([^"'#]+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+  const re = /<a\s+href=["'](https?:\/\/hotelbank\.jp\/[a-z0-9\-]+\/[^"']+?)["']\s*>\s*<\/a>\s*<h1[^>]*>([\s\S]*?)<\/h1>/gi;
   let m;
-  while ((m = anchorRe.exec(html)) !== null) {
-    let url;
-    try {
-      url = new URL(m[1], BASE).href;
-    } catch (e) {
-      continue;
-    }
-    url = url.split("?")[0];
+  while ((m = re.exec(html)) !== null) {
+    const url = m[1].split("?")[0];
     if (!ARTICLE_RE.test(url)) continue;
     if (seen.has(url)) continue;
 
-    // タイトル：画像alt → アンカーテキストの順
-    let title = "";
-    const img = m[2].match(/<img[^>]+alt=["']([^"']+)["']/i);
-    if (img) title = clean(img[1]);
-    if (!title) title = clean(m[2]);
+    const title = clean(m[2]);
     if (!title || title.length < 6 || looksLikeJunk(title)) continue;
 
-    // 周辺テキストから日付を探す（カード構造を広めに見る）
-    const ctx = html.slice(Math.max(0, m.index - 450), m.index + m[0].length + 450);
-    const date = findDate(ctx);
+    // 日付：このh1以降〜900字以内の <span class="date"> 等を探す
+    const date = findDate(html.slice(m.index, m.index + 900));
 
     seen.add(url);
     items.push({ title, link: url, date });
