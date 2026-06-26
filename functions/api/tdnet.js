@@ -32,6 +32,18 @@ function isPropertyDeal(desc) {
   return PROPERTY_KEYWORDS.some((kw) => desc.indexOf(kw) >= 0);
 }
 
+// 上場REIT(投資法人)の開示か判定
+// やのしんAPIの社名は略称が多く「投資法人」を含まないことがあり、
+// REIT銘柄は社名先頭に「Ｒ−」が付く傾向があるため複数条件で判定。
+function isReit(name) {
+  if (!name) return false;
+  if (name.indexOf("投資法人") >= 0) return true;
+  if (/リート|リート|REIT/i.test(name)) return true;
+  const c = name.charAt(0);
+  if (c === "Ｒ" || c === "R") return true; // 「Ｒ−○○」等のREIT表記
+  return false;
+}
+
 function pad(n) {
   return n < 10 ? "0" + n : "" + n;
 }
@@ -173,18 +185,23 @@ export async function onRequest(context) {
         }
         const data = await res.json();
         const items = (data && data.items) || [];
-        const reits = items
+        // 全開示を取り込み（REIT判定・物件判定は後段）。社名・コードも保持。
+        const list = items
           .map(rec)
-          .filter((t) => t && t.company_name && t.company_name.indexOf("投資法人") >= 0 && t.title)
+          .filter((t) => t && t.title)
           .map((t) => ({
-            company: t.company_name,
+            company: t.company_name || "",
+            code: t.company_code || "",
             title: t.title,
             pubdate: t.pubdate || "",
             ts: Date.parse((t.pubdate || "").replace(" ", "T") + "+09:00"),
             link: t.document_url || t.url || "",
           }));
-        dayStatus[date] = { total: items.length, reit: reits.length };
-        return reits;
+        dayStatus[date] = {
+          total: items.length,
+          reitProp: list.filter((x) => isReit(x.company) && isPropertyDeal(x.title)).length,
+        };
+        return list;
       } catch (e) {
         clearTimeout(to);
         if (attempt === 0) continue;
@@ -207,23 +224,26 @@ export async function onRequest(context) {
     let all = [].concat.apply([], lists);
     all.sort((a, b) => (b.ts || 0) - (a.ts || 0));
 
-    // 診断: 投資法人の全開示（題名そのまま）を返す
+    // 診断: 全社の「物件取引お知らせ」を社名・コード付きで返す（REIT判定の確認用）
     if (dump) {
       return jsonResponse({
-        count: all.length,
+        totalAll: all.length,
         days: dayStatus,
-        items: all.map((it) => ({
-          date: it.pubdate ? it.pubdate.slice(0, 10) : "",
-          company: it.company,
-          title: it.title,
-          hit: isPropertyDeal(it.title),
-        })),
+        property: all
+          .filter((it) => isPropertyDeal(it.title))
+          .map((it) => ({
+            date: it.pubdate ? it.pubdate.slice(0, 10) : "",
+            company: it.company,
+            code: it.code,
+            reit: isReit(it.company),
+            title: it.title,
+          })),
       });
     }
 
-    // 物件の取得・売却・賃貸借に限定
+    // 上場REIT(投資法人) かつ 物件の取得・売却・賃貸借に限定
     let items = all
-      .filter((it) => isPropertyDeal(it.title))
+      .filter((it) => isReit(it.company) && isPropertyDeal(it.title))
       .slice(0, 80)
       .map((it) => ({
         date: it.pubdate ? it.pubdate.slice(5, 10).replace("-", "/") : "",
@@ -233,7 +253,7 @@ export async function onRequest(context) {
 
     const body = { updatedAt: new Date().toISOString(), days: DAYS, items };
     if (debugOn) {
-      body.debug = { dayStatus: dayStatus, totalReit: all.length, hits: items.length };
+      body.debug = { dayStatus: dayStatus, totalAll: all.length, hits: items.length };
     }
 
     return jsonResponse(body, {
