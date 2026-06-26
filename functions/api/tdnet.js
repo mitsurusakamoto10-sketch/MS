@@ -70,6 +70,28 @@ export async function onRequest(context) {
   const reqUrl = new URL(context.request.url);
   const debugOn = reqUrl.searchParams.get("debug") === "1";
   const dump = reqUrl.searchParams.get("dump") === "1";
+  const raw = reqUrl.searchParams.get("raw"); // ?raw=YYYYMMDD で生レスポンス確認
+
+  // raw: 指定日の生APIレスポンス（先頭）＋件数を返す
+  if (raw) {
+    const url =
+      "https://webapi.yanoshin.jp/webapi/tdnet/list/" + raw + ".json?limit=" + PER_DAY_LIMIT;
+    try {
+      const res = await fetch(url, { headers: { Accept: "application/json" } });
+      const text = await res.text();
+      let total = -1;
+      try {
+        const j = JSON.parse(text);
+        total = ((j && j.items) || []).length;
+      } catch (e) {}
+      return new Response(
+        "status=" + res.status + " total=" + total + "\n\n" + text.slice(0, 4000),
+        { headers: { "Content-Type": "text/plain; charset=utf-8" } }
+      );
+    } catch (e) {
+      return new Response("fetch error: " + e, { status: 502 });
+    }
+  }
 
   // 直近DAYS日分の日付（JST基準）
   const baseJst = new Date(Date.now() + 9 * 3600000);
@@ -113,7 +135,7 @@ export async function onRequest(context) {
               ts: Date.parse((t.pubdate || "").replace(" ", "T") + "+09:00"),
               link: t.document_url || t.url || "",
             }));
-          dayStatus[date] = reits.length;
+          dayStatus[date] = { total: items.length, reit: reits.length };
           return reits;
         } catch (e) {
           dayStatus[date] = "err";
