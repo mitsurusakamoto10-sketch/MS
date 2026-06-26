@@ -422,7 +422,7 @@ async function loadPRTimes(force) {
   const el = document.getElementById("prtimes-grid");
   if (!el) return;
   try {
-    const url = force ? "/api/prtimes?fresh=1&t=" + Date.now() : "/api/prtimes";
+    const url = force ? "/api/competitors?fresh=1&t=" + Date.now() : "/api/competitors";
     const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) throw new Error("status " + res.status);
     const data = await res.json();
@@ -430,7 +430,7 @@ async function loadPRTimes(force) {
       el.innerHTML =
         '<div class="strip-loading">直近' +
         (data.days || 10) +
-        "日に競合各社のPR TIMESリリースはありませんでした。</div>";
+        "日に競合各社のリリースはありませんでした。</div>";
       return;
     }
     el.innerHTML = data.items.map(prtimesRow).join("");
