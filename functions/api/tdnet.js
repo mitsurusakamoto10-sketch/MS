@@ -32,7 +32,7 @@ function isPropertyDeal(desc) {
 function isReit(name) {
   if (!name) return false;
   if (name.indexOf("投資法人") >= 0) return true;
-  if (/リート|リート|REIT/i.test(name)) return true;
+  if (/REIT/i.test(name)) return true; // カタカナ「リート」は誤検出(アクリート等)があるため除外
   // やのしんはREIT銘柄名を「Ｒ－○○」(全角Ｒ)で始める。
   // 半角Rは非REIT企業(REVOLUTION等)があるため全角Ｒのみ採用。
   if (name.charCodeAt(0) === 0xff32) return true; // 全角Ｒ始まり
