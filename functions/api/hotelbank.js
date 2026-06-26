@@ -187,7 +187,7 @@ ${list}`;
     });
     if (res.ok) {
       const data = await res.json();
-      return extractIndices(collectText(data));
+      return { indices: extractIndices(collectText(data)), model: model };
     }
     lastStatus = res.status;
   }
@@ -276,7 +276,9 @@ export async function onRequest(context) {
     const key = context.env && context.env.GEMINI_API_KEY;
     if (key) {
       try {
-        const idx = await rankWithGemini(key, candidates);
+        const ranked = await rankWithGemini(key, candidates);
+        const idx = ranked.indices;
+        debug.rankModel = ranked.model;
         const picked = [];
         const used = new Set();
         for (const i of idx) {

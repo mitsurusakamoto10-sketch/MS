@@ -14,9 +14,11 @@
 // ※毎朝8時(JST)に更新されるようキャッシュします。
 // ============================================================
 
-// 使用モデル（無料枠で使える最新Flashを優先し、失敗時は従来モデルへ）
-// gemini-3-flash-preview: 2026年の無料枠・推奨の最新Flash（Google検索対応）
-const GEMINI_MODELS = ["gemini-3-flash-preview", "gemini-2.5-flash"];
+// 使用モデル（無料枠で使えるFlash）
+// ※Gemini 3 Flashはこの無料キーではグラウンディング付き呼び出しが429
+//   （クォータ/課金エラー）になるため、無料で確実に動く2.5-flashを採用。
+//   将来 課金設定や無料枠拡大で3系が使えるようになれば先頭に追加可能。
+const GEMINI_MODELS = ["gemini-2.5-flash"];
 
 // 翌朝8時(JST)までの秒数（毎朝8時に更新されるようにキャッシュ）
 function secondsUntilNext8amJST() {
