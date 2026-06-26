@@ -417,6 +417,46 @@ async function loadHotelBank(force) {
   }
 }
 
+// 競合各社リリース（PR TIMES・直近10日・最新順／会社名 + 日付 + リリース名）
+async function loadPRTimes(force) {
+  const el = document.getElementById("prtimes-grid");
+  if (!el) return;
+  try {
+    const url = force ? "/api/prtimes?fresh=1&t=" + Date.now() : "/api/prtimes";
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error("status " + res.status);
+    const data = await res.json();
+    if (!data.items || data.items.length === 0) {
+      el.innerHTML =
+        '<div class="strip-loading">直近' +
+        (data.days || 10) +
+        "日に競合各社のPR TIMESリリースはありませんでした。</div>";
+      return;
+    }
+    el.innerHTML = data.items.map(prtimesRow).join("");
+  } catch (e) {
+    el.innerHTML =
+      '<div class="strip-loading">競合リリースを取得できませんでした（あとで再取得します）。</div>';
+  }
+}
+
+// 1行＝1リリース（日付バッジ + 会社名バッジ + リリース名）
+function prtimesRow(it) {
+  return (
+    '<a class="release-row" href="' +
+    escAttr(it.link) +
+    '" target="_blank" rel="noopener">' +
+    '<span class="release-title">' +
+    (it.date ? '<span class="release-date">' + esc(it.date) + "</span>" : "") +
+    '<span class="prt-company">' +
+    esc(it.company) +
+    "</span>" +
+    esc(it.title) +
+    "</span>" +
+    "</a>"
+  );
+}
+
 // HTMLに使う文字をエスケープ（記号がそのまま表示されるようにする）
 function esc(str) {
   return String(str)
@@ -605,6 +645,16 @@ document.addEventListener("DOMContentLoaded", () => {
     "hotelbank-grid",
     loadHotelBank,
     "最新ニュースを取得中…"
+  );
+
+  // 競合リリース（PR TIMES）：初回取得 + 毎朝8時に更新 + 手動更新ボタン
+  loadPRTimes();
+  scheduleDailyAt8(loadPRTimes);
+  setupRefreshButton(
+    "prtimes-refresh",
+    "prtimes-grid",
+    loadPRTimes,
+    "競合リリースを取得中…"
   );
 });
 
