@@ -14,9 +14,21 @@
 
 const DAYS = 10;
 
-// PR TIMES企業別RSL
+// PR TIMES企業別RSS
 function prt(id) {
   return "https://prtimes.jp/companyrdf.php?company_id=" + id;
+}
+// 自社サイトHTMLスクレイピング指定
+function html(url) {
+  return { html: url };
+}
+// Google News RSS（社名検索・公式以外の報道も含む補完用）
+function gnews(query) {
+  return (
+    "https://news.google.com/rss/search?q=" +
+    encodeURIComponent('"' + query + '"') +
+    "&hl=ja&gl=JP&ceid=JP:ja"
+  );
 }
 
 // 各社の候補フィード（上から順に試し、最初に取れたものを採用）
@@ -36,7 +48,7 @@ const COMPANIES = [
     name: "東京建物",
     feeds: ["https://tatemono.com/news/rss/news.php", prt(52843)], // 自社RSS優先
   },
-  { name: "野村不動産", feeds: [prt(38280)] },                 // 自社403・PR TIMESも要確認
+  { name: "野村不動産", feeds: [prt(38280), gnews("野村不動産")] }, // 自社403・PR TIMES空 → Google News補完
   {
     name: "東急不動産",
     feeds: [
@@ -47,7 +59,14 @@ const COMPANIES = [
     ],
   },
   { name: "森トラスト", feeds: [prt(18049)] },                 // 自社はHTMLのみ → PR TIMES
-  { name: "ヒューリック", feeds: [prt(46371)] },               // 自社はHTMLのみ → PR TIMES
+  {
+    name: "ヒューリック",
+    feeds: [
+      html("https://www.hulic.co.jp/news/"), // 自社HTML優先（公式の最新）
+      prt(46371),
+      gnews("ヒューリック"),                  // 取れない場合はGoogle News補完
+    ],
+  },
   { name: "森ビル", feeds: [prt(48109)] },                     // 自社はHTMLのみ → PR TIMES
 ];
 
@@ -125,6 +144,47 @@ function parseFeed(xml) {
   return items;
 }
 
+// 自社サイトHTMLから記事を抽出（/news/配下のリンク＋近傍に日付があるもの）
+function scrapeHtml(baseUrl, htmlText) {
+  const items = [];
+  const seen = new Set();
+  const anchorRe = /<a\b[^>]*href=["']([^"'#]+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+  let m;
+  while ((m = anchorRe.exec(htmlText)) !== null) {
+    let url;
+    try {
+      url = new URL(m[1], baseUrl).href.split("?")[0];
+    } catch (e) {
+      continue;
+    }
+    if (url.indexOf("/news/") < 0) continue;
+    if (/\/news\/?$/.test(url)) continue; // 一覧トップ自身は除外
+    if (seen.has(url)) continue;
+
+    let title = clean(m[2]);
+    const img = m[2].match(/<img[^>]+alt=["']([^"']+)["']/i);
+    if ((!title || title.length < 8) && img) title = clean(img[1]);
+    if (!title || title.length < 8 || /[{}]|css-/.test(title)) continue;
+
+    // 近傍に日付があるものだけ採用（ナビ等の除外）
+    const ctx = htmlText.slice(Math.max(0, m.index - 250), m.index + m[0].length + 250);
+    const dm =
+      ctx.match(/datetime=["'](20\d{2})-(\d{1,2})-(\d{1,2})/i) ||
+      ctx.match(/(20\d{2})[.\/\-](\d{1,2})[.\/\-](\d{1,2})/) ||
+      ctx.match(/(20\d{2})年\s*(\d{1,2})月\s*(\d{1,2})日/);
+    if (!dm) continue;
+    const ts = Date.parse(
+      dm[1] + "-" + pad2(+dm[2]) + "-" + pad2(+dm[3]) + "T00:00:00+09:00"
+    );
+    if (isNaN(ts)) continue;
+
+    seen.add(url);
+    items.push({ title, link: url, ts, date: toJstYmd(ts) });
+    if (items.length >= 20) break;
+  }
+  return items;
+}
+
 function jsonResponse(body, extraHeaders) {
   return new Response(JSON.stringify(body), {
     status: 200,
@@ -141,22 +201,46 @@ function jsonResponse(body, extraHeaders) {
 export async function onRequest(context) {
   const reqUrl = new URL(context.request.url);
   const debugOn = reqUrl.searchParams.get("debug");
+  const rawTarget = reqUrl.searchParams.get("raw"); // ?raw=会社名 でHTML確認
   const cutoff = Date.now() - DAYS * 86400000;
   const debug = {};
 
+  // raw指定時：その会社のHTML候補の記事リンク周辺HTMLを返す
+  if (rawTarget) {
+    const co = COMPANIES.find((c) => c.name === rawTarget);
+    const h = co && co.feeds.find((f) => typeof f === "object" && f.html);
+    if (h) {
+      try {
+        const res = await fetch(h.html, { headers: BROWSER_HEADERS, redirect: "follow" });
+        const t = await res.text();
+        const mm = t.match(/href=["'][^"']*\/news\/[^"']+["']/i);
+        const idx = mm ? t.indexOf(mm[0]) : 0;
+        return new Response(t.slice(Math.max(0, idx - 1500), idx + 2500), {
+          headers: { "Content-Type": "text/plain; charset=utf-8" },
+        });
+      } catch (e) {
+        return new Response("fetch error: " + e, { status: 502 });
+      }
+    }
+    return new Response("no html source for " + rawTarget, { status: 404 });
+  }
+
   const lists = await Promise.all(
     COMPANIES.map(async (co) => {
-      // 候補フィードを順に試し、最初にパースできたものを採用
-      for (const url of co.feeds) {
+      // 候補を順に試し、最初に取れたものを採用（文字列=RSS / {html}=スクレイピング）
+      for (const f of co.feeds) {
+        const isHtml = typeof f === "object" && f.html;
+        const url = isHtml ? f.html : f;
         try {
           const res = await fetch(url, { headers: BROWSER_HEADERS, redirect: "follow" });
           if (!res.ok) continue;
-          const xml = await res.text();
-          const all = parseFeed(xml);
+          const text = await res.text();
+          const all = isHtml ? scrapeHtml(url, text) : parseFeed(text);
           if (all.length === 0) continue;
           const recent = all.filter((it) => it.ts >= cutoff);
           debug[co.name] = {
             source: url,
+            type: isHtml ? "html" : "feed",
             status: 200,
             items: all.length,
             recent: recent.length,
