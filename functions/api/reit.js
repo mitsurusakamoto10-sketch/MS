@@ -40,6 +40,15 @@ function isPropertyDeal(desc) {
   return PROPERTY_KEYWORDS.some((kw) => desc.indexOf(kw) >= 0);
 }
 
+// 対象とする開示か判定
+// ・題名に物件取引キーワードを含む、または
+// ・投資法人の「臨時報告書」（REITの臨時報告書は主に資産の取得・譲渡の報告で、
+//   EDINETの題名は「臨時報告書」とだけ書かれ取引種別が題名に出ないため、これも対象にする）
+function isTargetDisclosure(desc) {
+  if (!desc) return false;
+  return isPropertyDeal(desc) || desc.indexOf("臨時報告書") >= 0;
+}
+
 // 翌朝8時(JST)までの秒数（毎朝8時に更新されるようにキャッシュ）
 function secondsUntilNext8amJST() {
   const nowJst = new Date(Date.now() + 9 * 3600000);
@@ -99,6 +108,9 @@ export async function onRequest(context) {
     dates.push(ymd(new Date(baseJst.getTime() - i * 86400000)));
   }
 
+  // 診断用: /api/reit?dump=1 で投資法人の全提出書類（題名付き）を一覧（フィルタ前）
+  const dump = new URL(context.request.url).searchParams.get("dump") === "1";
+
   try {
     const lists = await Promise.all(
       dates.map(async (date) => {
@@ -111,14 +123,13 @@ export async function onRequest(context) {
         if (!res.ok) return [];
         const data = await res.json();
         const results = (data && data.results) || [];
+        // まず投資法人の提出書類をすべて集める（フィルタは後段）
         return results
           .filter(
             (r) =>
               r.filerName &&
               r.filerName.indexOf("投資法人") >= 0 &&
-              r.docDescription &&
-              // 物件の取得・売却・賃貸借に関する開示だけに限定
-              isPropertyDeal(r.docDescription)
+              r.docDescription
           )
           .map((r) => ({
             docID: r.docID,
@@ -130,13 +141,44 @@ export async function onRequest(context) {
       })
     );
 
-    let items = [].concat.apply([], lists);
-    items.sort((a, b) => (b.ts || 0) - (a.ts || 0));
-    items = items.slice(0, 60).map((it) => ({
-      date: it.submit ? it.submit.slice(5, 10).replace("-", "/") : "",
-      title: it.filer + "：" + it.title,
-      link: "/api/edinet-doc?docID=" + encodeURIComponent(it.docID),
-    }));
+    let all = [].concat.apply([], lists);
+    all.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+
+    // 診断: 投資法人の全書類（題名そのまま）を返す
+    if (dump) {
+      return new Response(
+        JSON.stringify(
+          {
+            count: all.length,
+            items: all.map((it) => ({
+              date: it.submit ? it.submit.slice(0, 10) : "",
+              filer: it.filer,
+              doc: it.title,
+              hit: isTargetDisclosure(it.title),
+            })),
+          },
+          null,
+          2
+        ),
+        {
+          headers: {
+            "Content-Type": "application/json; charset=utf-8",
+            "Cache-Control": "no-store",
+            "Access-Control-Allow-Origin": "*",
+          },
+        }
+      );
+    }
+
+    // 物件取引（取得・売却・賃貸借）＋投資法人の臨時報告書に限定
+    let items = all
+      .filter((it) => isTargetDisclosure(it.title))
+      .slice(0, 60)
+      .map((it) => ({
+        date: it.submit ? it.submit.slice(5, 10).replace("-", "/") : "",
+        title: it.filer + "：" + it.title,
+        link: "/api/edinet-doc?docID=" + encodeURIComponent(it.docID),
+      }));
 
     return new Response(
       JSON.stringify({ updatedAt: new Date().toISOString(), items }),
