@@ -72,6 +72,41 @@ export async function onRequest(context) {
   const dump = reqUrl.searchParams.get("dump") === "1";
   const raw = reqUrl.searchParams.get("raw"); // ?raw=YYYYMMDD で生レスポンス確認
 
+  // 情報源到達性プローブ: 各取得に8秒タイムアウトを付けて並行試行
+  if (reqUrl.searchParams.get("probe") === "1") {
+    const targets = [
+      ["yanoshin_recent", "https://webapi.yanoshin.jp/webapi/tdnet/list/recent.json?limit=5"],
+      ["yanoshin_8960", "https://webapi.yanoshin.jp/webapi/tdnet/list/8960.json?limit=5"],
+      ["official_tdnet", "https://www.release.tdnet.info/inbs/I_list_001_20260604.html"],
+      ["kabutan_disclose", "https://kabutan.jp/disclosures/?code=8960"],
+    ];
+    const out = {};
+    await Promise.all(
+      targets.map(async ([name, url]) => {
+        const ctrl = new AbortController();
+        const to = setTimeout(() => ctrl.abort(), 8000);
+        try {
+          const r = await fetch(url, {
+            signal: ctrl.signal,
+            headers: {
+              "User-Agent":
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+              Accept: "*/*",
+              "Accept-Language": "ja,en;q=0.8",
+            },
+          });
+          const txt = await r.text();
+          out[name] = { status: r.status, length: txt.length, head: txt.slice(0, 160) };
+        } catch (e) {
+          out[name] = { error: String(e).slice(0, 140) };
+        } finally {
+          clearTimeout(to);
+        }
+      })
+    );
+    return jsonResponse({ probe: out });
+  }
+
   // raw: 指定日の生APIレスポンス（先頭）＋件数を返す
   if (raw) {
     const url =
