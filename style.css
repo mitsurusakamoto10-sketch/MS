@@ -434,6 +434,13 @@ body {
   color: var(--accent-strong);
   text-decoration: none;
 }
+/* 見出し下の補足（対象企業名など） */
+.thumb-sub {
+  margin: -2px 0 8px;
+  font-size: 0.72rem;
+  color: var(--text-sub);
+  line-height: 1.5;
+}
 /* 見出し右側のまとまり（補足ラベル + 更新ボタン） */
 .thumb-head-right {
   display: flex;
