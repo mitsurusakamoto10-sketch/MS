@@ -30,6 +30,14 @@ function gnews(query) {
     "&hl=ja&gl=JP&ceid=JP:ja"
   );
 }
+// Bing News RSS（社名検索・補完用。Google Newsが不可な環境向け）
+function bingnews(query) {
+  return (
+    "https://www.bing.com/news/search?q=" +
+    encodeURIComponent('"' + query + '"') +
+    "&format=rss&setlang=ja-JP&cc=JP"
+  );
+}
 
 // 各社の候補フィード（上から順に試し、最初に取れたものを採用）
 // 自社RSSを先頭に置く社は、そちらが“真の最新”になる。
@@ -48,7 +56,7 @@ const COMPANIES = [
     name: "東京建物",
     feeds: ["https://tatemono.com/news/rss/news.php", prt(52843)], // 自社RSS優先
   },
-  { name: "野村不動産", feeds: [prt(38280), gnews("野村不動産")] }, // 自社403・PR TIMES空 → Google News補完
+  { name: "野村不動産", feeds: [prt(38280), bingnews("野村不動産"), gnews("野村不動産")] }, // 自社403・PR TIMES空 → ニュース検索で補完
   {
     name: "東急不動産",
     feeds: [
