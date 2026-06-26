@@ -39,9 +39,15 @@ function isReit(name) {
   if (!name) return false;
   if (name.indexOf("投資法人") >= 0) return true;
   if (/リート|リート|REIT/i.test(name)) return true;
-  const c = name.charAt(0);
-  if (c === "Ｒ" || c === "R") return true; // 「Ｒ−○○」等のREIT表記
+  // やのしんはREIT銘柄名を「Ｒ－○○」(全角Ｒ)等で始める
+  const code0 = name.charCodeAt(0);
+  if (code0 === 0xff32 || code0 === 0x52) return true; // 全角Ｒ / 半角R
   return false;
+}
+
+// 表示用に先頭の「Ｒ－」「R-」等のREIT接頭辞を除去
+function cleanCompany(name) {
+  return String(name || "").replace(/^[ＲR][－\-−]\s*/, "");
 }
 
 function pad(n) {
@@ -238,7 +244,7 @@ export async function onRequest(context) {
             reit: isReit(it.company),
             title: it.title,
           })),
-      });
+      }, { "Cache-Control": "no-store" });
     }
 
     // 上場REIT(投資法人) かつ 物件の取得・売却・賃貸借に限定
@@ -247,7 +253,7 @@ export async function onRequest(context) {
       .slice(0, 80)
       .map((it) => ({
         date: it.pubdate ? it.pubdate.slice(5, 10).replace("-", "/") : "",
-        title: it.company + "：" + it.title,
+        title: cleanCompany(it.company) + "：" + it.title,
         link: it.link,
       }));
 
@@ -257,7 +263,8 @@ export async function onRequest(context) {
     }
 
     return jsonResponse(body, {
-      "Cache-Control": "public, max-age=" + secondsUntilNext8amJST(),
+      // debug時はキャッシュ無効。通常は毎朝8時まで。
+      "Cache-Control": debugOn ? "no-store" : "public, max-age=" + secondsUntilNext8amJST(),
     });
   } catch (e) {
     const body = { updatedAt: new Date().toISOString(), items: [], error: String(e) };
