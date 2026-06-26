@@ -68,12 +68,10 @@ const COMPANIES = [
   },
   { name: "森トラスト", feeds: [prt(18049)] },                 // 自社はHTMLのみ → PR TIMES
   {
+    // 自社サイトはJS描画(E-IRウィジェット)で静的取得不可・PR TIMESは古い
+    // → Bing News（社名検索）で最新を補完。PR TIMESを最終フォールバック。
     name: "ヒューリック",
-    feeds: [
-      html("https://www.hulic.co.jp/news/"), // 自社HTML優先（公式の最新）
-      prt(46371),
-      gnews("ヒューリック"),                  // 取れない場合はGoogle News補完
-    ],
+    feeds: [bingnews("ヒューリック"), prt(46371)],
   },
   { name: "森ビル", feeds: [prt(48109)] },                     // 自社はHTMLのみ → PR TIMES
 ];
