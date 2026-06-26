@@ -256,13 +256,45 @@ export async function onRequest(context) {
       body.debug = { dayStatus: dayStatus, totalAll: all.length, hits: items.length };
     }
 
-    return jsonResponse(body, {
-      // debug時はキャッシュ無効。通常は毎朝8時まで。
-      "Cache-Control": debugOn ? "no-store" : "public, max-age=" + secondsUntilNext8amJST(),
-    });
+    const cache = caches.default;
+    const cacheKey = new Request("https://tdnet.local/reit-property-lastgood-v1");
+
+    if (items.length > 0) {
+      // 成功：結果を「last-good」として保存（やのしん不調時のフォールバック用・7日）
+      if (!debugOn && context.waitUntil) {
+        context.waitUntil(
+          cache.put(cacheKey, jsonResponse(body, { "Cache-Control": "max-age=604800" }))
+        );
+      }
+      return jsonResponse(body, {
+        "Cache-Control": debugOn ? "no-store" : "public, max-age=" + secondsUntilNext8amJST(),
+      });
+    }
+
+    // 取得失敗/0件：直近の成功結果(last-good)があればそれを返す（空表示を避ける）
+    if (!debugOn) {
+      const cached = await cache.match(cacheKey);
+      if (cached) {
+        const prev = await cached.json();
+        prev.stale = true; // 直近の成功結果を表示している印
+        return jsonResponse(prev, { "Cache-Control": "public, max-age=600" });
+      }
+    }
+    return jsonResponse(body, { "Cache-Control": "no-store" });
   } catch (e) {
+    // 例外時もlast-goodがあれば返す
+    try {
+      const cached = await caches.default.match(
+        new Request("https://tdnet.local/reit-property-lastgood-v1")
+      );
+      if (cached && !debugOn) {
+        const prev = await cached.json();
+        prev.stale = true;
+        return jsonResponse(prev, { "Cache-Control": "public, max-age=600" });
+      }
+    } catch (e2) {}
     const body = { updatedAt: new Date().toISOString(), items: [], error: String(e) };
     if (debugOn) body.debug = { dayStatus: dayStatus };
-    return jsonResponse(body);
+    return jsonResponse(body, { "Cache-Control": "no-store" });
   }
 }
