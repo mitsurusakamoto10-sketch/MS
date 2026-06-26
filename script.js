@@ -470,7 +470,7 @@ function escAttr(str) {
   return esc(str).replace(/"/g, "&quot;");
 }
 
-// 上場REIT開示（EDINET・直近10日・題名のみ）
+// 上場REIT開示（EDINET・直近1か月・題名のみ）
 async function loadREIT(force) {
   const el = document.getElementById("disclosure-card");
   if (!el) return;
@@ -487,7 +487,7 @@ async function loadREIT(force) {
     }
     if (!data.items || data.items.length === 0) {
       el.innerHTML =
-        '<div class="strip-loading">直近10日に、物件の取得・売却・賃貸借に関する開示はありませんでした。</div>';
+        '<div class="strip-loading">直近1か月に、物件の取得・売却・賃貸借に関する開示はありませんでした。</div>';
       return;
     }
     el.innerHTML =

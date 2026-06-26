@@ -1,7 +1,7 @@
 // ============================================================
 // 上場REIT(投資法人)の開示書類一覧 Function（EDINET API v2）
 // ------------------------------------------------------------
-// EDINET API から直近10日間の提出書類を取得し、提出者名に
+// EDINET API から直近1か月(30日)間の提出書類を取得し、提出者名に
 // 「投資法人」を含むもの（=上場REIT等）のうち、
 // 「物件の取得・売却・賃貸借」に関する開示の題名のみを返します。
 // （題名 docDescription が PROPERTY_KEYWORDS のいずれかを含むもの）
@@ -92,10 +92,10 @@ export async function onRequest(context) {
     );
   }
 
-  // 直近10日分の日付（JST基準）
+  // 直近1か月（30日）分の日付（JST基準）
   const baseJst = new Date(Date.now() + 9 * 3600000);
   const dates = [];
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 30; i++) {
     dates.push(ymd(new Date(baseJst.getTime() - i * 86400000)));
   }
 
@@ -132,7 +132,7 @@ export async function onRequest(context) {
 
     let items = [].concat.apply([], lists);
     items.sort((a, b) => (b.ts || 0) - (a.ts || 0));
-    items = items.slice(0, 30).map((it) => ({
+    items = items.slice(0, 60).map((it) => ({
       date: it.submit ? it.submit.slice(5, 10).replace("-", "/") : "",
       title: it.filer + "：" + it.title,
       link: "/api/edinet-doc?docID=" + encodeURIComponent(it.docID),
