@@ -12,7 +12,7 @@
 // ============================================================
 
 const DAYS = 30;
-const PER_DAY_LIMIT = 1000;
+const PER_DAY_LIMIT = 500; // 1日の適時開示はピーク日でも数百件。1000はタイムアウト(504)するため500。
 
 // 物件の取得・売却・賃貸借に関する開示のキーワード（TDnet題名向け）
 const PROPERTY_KEYWORDS = [
@@ -149,47 +149,60 @@ export async function onRequest(context) {
 
   const dayStatus = {};
 
-  try {
-    const lists = await Promise.all(
-      dates.map(async (date) => {
-        const url =
-          "https://webapi.yanoshin.jp/webapi/tdnet/list/" +
-          date +
-          ".json?limit=" +
-          PER_DAY_LIMIT;
-        try {
-          const res = await fetch(url, {
-            headers: {
-              "User-Agent":
-                "Mozilla/5.0 (compatible; MyPortal/1.0; +https://myworkportal.pages.dev)",
-              Accept: "application/json",
-            },
-          });
-          if (!res.ok) {
-            dayStatus[date] = "status " + res.status;
-            return [];
-          }
-          const data = await res.json();
-          const items = (data && data.items) || [];
-          // 投資法人(REIT)の開示だけ抽出（題名は後段でフィルタ）
-          const reits = items
-            .map(rec)
-            .filter((t) => t && t.company_name && t.company_name.indexOf("投資法人") >= 0 && t.title)
-            .map((t) => ({
-              company: t.company_name,
-              title: t.title,
-              pubdate: t.pubdate || "",
-              ts: Date.parse((t.pubdate || "").replace(" ", "T") + "+09:00"),
-              link: t.document_url || t.url || "",
-            }));
-          dayStatus[date] = { total: items.length, reit: reits.length };
-          return reits;
-        } catch (e) {
-          dayStatus[date] = "err";
+  // 1日分を取得（8秒タイムアウト＋1回リトライ）。投資法人の開示だけ返す。
+  async function fetchDay(date) {
+    const url =
+      "https://webapi.yanoshin.jp/webapi/tdnet/list/" + date + ".json?limit=" + PER_DAY_LIMIT;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const ctrl = new AbortController();
+      const to = setTimeout(() => ctrl.abort(), 8000);
+      try {
+        const res = await fetch(url, {
+          signal: ctrl.signal,
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (compatible; MyPortal/1.0; +https://myworkportal.pages.dev)",
+            Accept: "application/json",
+          },
+        });
+        clearTimeout(to);
+        if (!res.ok) {
+          if (attempt === 0) continue;
+          dayStatus[date] = "status " + res.status;
           return [];
         }
-      })
-    );
+        const data = await res.json();
+        const items = (data && data.items) || [];
+        const reits = items
+          .map(rec)
+          .filter((t) => t && t.company_name && t.company_name.indexOf("投資法人") >= 0 && t.title)
+          .map((t) => ({
+            company: t.company_name,
+            title: t.title,
+            pubdate: t.pubdate || "",
+            ts: Date.parse((t.pubdate || "").replace(" ", "T") + "+09:00"),
+            link: t.document_url || t.url || "",
+          }));
+        dayStatus[date] = { total: items.length, reit: reits.length };
+        return reits;
+      } catch (e) {
+        clearTimeout(to);
+        if (attempt === 0) continue;
+        dayStatus[date] = "err";
+        return [];
+      }
+    }
+    return [];
+  }
+
+  try {
+    // やのしんへの負荷を抑えるため、6並列ずつのバッチで取得
+    const lists = [];
+    const CONC = 6;
+    for (let i = 0; i < dates.length; i += CONC) {
+      const part = await Promise.all(dates.slice(i, i + CONC).map(fetchDay));
+      lists.push.apply(lists, part);
+    }
 
     let all = [].concat.apply([], lists);
     all.sort((a, b) => (b.ts || 0) - (a.ts || 0));
