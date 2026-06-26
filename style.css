@@ -557,6 +557,20 @@ body {
   font-weight: 700;
   vertical-align: middle;
 }
+/* 競合リリースは約7件だけ表示し、直近10日分の残りはスクロールで閲覧 */
+#prtimes-grid {
+  max-height: 308px; /* 約7行分 */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+#prtimes-grid::-webkit-scrollbar {
+  width: 6px;
+}
+#prtimes-grid::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
 .release-summary {
   display: block;
   margin-top: 3px;
