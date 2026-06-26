@@ -14,22 +14,16 @@
 const DAYS = 30;
 const PER_DAY_LIMIT = 500; // 1日の適時開示はピーク日でも数百件。1000はタイムアウト(504)するため500。
 
-// 物件の取得・売却・賃貸借に関する開示のキーワード（TDnet題名向け）
-const PROPERTY_KEYWORDS = [
-  "取得",
-  "売却",
-  "譲渡",
-  "処分",
-  "賃貸借",
-  "賃貸",
-  "貸借", // 「取得及び貸借」等
-  "リース",
-  "信託受益権",
-];
+// 物件取引と判定するには「動作」と「不動産系の対象」の両方を題名に含むこと。
+// （自己株式/自己投資口/新株予約権の「取得」等のノイズを除外するため）
+const ACTION_KEYWORDS = ["取得", "売却", "譲渡", "処分", "賃貸借", "賃貸", "貸借", "リース"];
+const ESTATE_KEYWORDS = ["不動産", "物件", "信託受益権", "底地", "資産"];
 
 function isPropertyDeal(desc) {
   if (!desc) return false;
-  return PROPERTY_KEYWORDS.some((kw) => desc.indexOf(kw) >= 0);
+  const hasAction = ACTION_KEYWORDS.some((kw) => desc.indexOf(kw) >= 0);
+  const hasEstate = ESTATE_KEYWORDS.some((kw) => desc.indexOf(kw) >= 0);
+  return hasAction && hasEstate;
 }
 
 // 上場REIT(投資法人)の開示か判定
@@ -39,9 +33,9 @@ function isReit(name) {
   if (!name) return false;
   if (name.indexOf("投資法人") >= 0) return true;
   if (/リート|リート|REIT/i.test(name)) return true;
-  // やのしんはREIT銘柄名を「Ｒ－○○」(全角Ｒ)等で始める
-  const code0 = name.charCodeAt(0);
-  if (code0 === 0xff32 || code0 === 0x52) return true; // 全角Ｒ / 半角R
+  // やのしんはREIT銘柄名を「Ｒ－○○」(全角Ｒ)で始める。
+  // 半角Rは非REIT企業(REVOLUTION等)があるため全角Ｒのみ採用。
+  if (name.charCodeAt(0) === 0xff32) return true; // 全角Ｒ始まり
   return false;
 }
 

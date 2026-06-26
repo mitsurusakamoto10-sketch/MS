@@ -475,8 +475,8 @@ async function loadREIT(force) {
   const el = document.getElementById("disclosure-card");
   if (!el) return;
   try {
-    // force=true のときはキャッシュを避け、その時点でEDINETを再取得する
-    const url = force ? "/api/reit?fresh=1&t=" + Date.now() : "/api/reit";
+    // force=true のときはキャッシュを避け、その時点でTDnet(適時開示)を再取得する
+    const url = force ? "/api/tdnet?fresh=1&t=" + Date.now() : "/api/tdnet";
     const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) throw new Error("status " + res.status);
     const data = await res.json();
