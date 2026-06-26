@@ -151,7 +151,7 @@ export async function onRequest(context) {
 
     let res = null;
     let usedModel = null;
-    let lastErr = "";
+    const tries = [];
     for (const model of GEMINI_MODELS) {
       const endpoint =
         "https://generativelanguage.googleapis.com/v1beta/models/" +
@@ -166,13 +166,16 @@ export async function onRequest(context) {
       if (r.ok) {
         res = r;
         usedModel = model;
+        tries.push({ model: model, status: r.status });
         break;
       }
-      lastErr = "model " + model + " -> " + r.status;
+      const errSnippet = await r.text();
+      tries.push({ model: model, status: r.status, error: errSnippet.slice(0, 220) });
     }
 
     if (!res) {
-      const body = { items: [], error: "api_error", detail: lastErr };
+      const body = { items: [], error: "api_error" };
+      if (debugOn) body.tries = tries;
       return jsonResponse(body);
     }
 
@@ -194,6 +197,7 @@ export async function onRequest(context) {
     if (debugOn) {
       body.debug = {
         model: usedModel,
+        tries: tries,
         finishReason:
           data.candidates && data.candidates[0] && data.candidates[0].finishReason,
         textLength: text.length,
