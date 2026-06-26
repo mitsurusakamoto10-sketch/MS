@@ -14,8 +14,9 @@
 // ※毎朝8時(JST)に更新されるようキャッシュします。
 // ============================================================
 
-// 使用モデル（無料枠で利用可能なFlash系）
-const GEMINI_MODEL = "gemini-2.5-flash";
+// 使用モデル（無料枠で使える最新Flashを優先し、失敗時は従来モデルへ）
+// gemini-3-flash-preview: 2026年の無料枠・推奨の最新Flash（Google検索対応）
+const GEMINI_MODELS = ["gemini-3-flash-preview", "gemini-2.5-flash"];
 
 // 翌朝8時(JST)までの秒数（毎朝8時に更新されるようにキャッシュ）
 function secondsUntilNext8amJST() {
@@ -141,26 +142,37 @@ export async function onRequest(context) {
 
   try {
     // Gemini（Google検索グラウンディング付き）へ調査を依頼
-    const endpoint =
-      "https://generativelanguage.googleapis.com/v1beta/models/" +
-      GEMINI_MODEL +
-      ":generateContent?key=" +
-      encodeURIComponent(key);
-
-    const res = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: buildPrompt() }] }],
-        tools: [{ google_search: {} }],
-        generationConfig: { temperature: 0.2 },
-      }),
+    // 最新の無料Flashを優先し、利用不可なら従来モデルへフォールバック
+    const reqBody = JSON.stringify({
+      contents: [{ role: "user", parts: [{ text: buildPrompt() }] }],
+      tools: [{ google_search: {} }],
+      generationConfig: { temperature: 0.2 },
     });
 
-    if (!res.ok) {
-      const errText = await res.text();
-      const body = { items: [], error: "api_error", status: res.status };
-      if (debugOn) body.detail = errText.slice(0, 800);
+    let res = null;
+    let usedModel = null;
+    let lastErr = "";
+    for (const model of GEMINI_MODELS) {
+      const endpoint =
+        "https://generativelanguage.googleapis.com/v1beta/models/" +
+        model +
+        ":generateContent?key=" +
+        encodeURIComponent(key);
+      const r = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: reqBody,
+      });
+      if (r.ok) {
+        res = r;
+        usedModel = model;
+        break;
+      }
+      lastErr = "model " + model + " -> " + r.status;
+    }
+
+    if (!res) {
+      const body = { items: [], error: "api_error", detail: lastErr };
       return jsonResponse(body);
     }
 
@@ -181,6 +193,7 @@ export async function onRequest(context) {
     const body = { updatedAt: new Date().toISOString(), items };
     if (debugOn) {
       body.debug = {
+        model: usedModel,
         finishReason:
           data.candidates && data.candidates[0] && data.candidates[0].finishReason,
         textLength: text.length,

@@ -15,7 +15,8 @@
 //   ※RSS(/feed/)は500/404のため使わず、HTML一覧を解析します。
 // ============================================================
 
-const GEMINI_MODEL = "gemini-2.5-flash";
+// 無料枠で使える最新Flashを優先し、失敗時は従来モデルへフォールバック
+const GEMINI_MODELS = ["gemini-3-flash-preview", "gemini-2.5-flash"];
 
 // 記事一覧の取得元（すべて取得して候補を統合）
 const PAGES = [
@@ -167,23 +168,30 @@ async function rankWithGemini(key, candidates) {
 記事リスト:
 ${list}`;
 
-  const endpoint =
-    "https://generativelanguage.googleapis.com/v1beta/models/" +
-    GEMINI_MODEL +
-    ":generateContent?key=" +
-    encodeURIComponent(key);
-
-  const res = await fetch(endpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.1 },
-    }),
+  const reqBody = JSON.stringify({
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    generationConfig: { temperature: 0.1 },
   });
-  if (!res.ok) throw new Error("gemini status " + res.status);
-  const data = await res.json();
-  return extractIndices(collectText(data));
+
+  let lastStatus = 0;
+  for (const model of GEMINI_MODELS) {
+    const endpoint =
+      "https://generativelanguage.googleapis.com/v1beta/models/" +
+      model +
+      ":generateContent?key=" +
+      encodeURIComponent(key);
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: reqBody,
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return extractIndices(collectText(data));
+    }
+    lastStatus = res.status;
+  }
+  throw new Error("gemini status " + lastStatus);
 }
 
 async function fetchPage(url) {
