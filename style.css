@@ -564,9 +564,9 @@ body {
   font-weight: 700;
   vertical-align: middle;
 }
-/* 競合リリースは約7件だけ表示し、直近10日分の残りはスクロールで閲覧 */
+/* 競合リリース・REIT開示は最新6件だけ表示し、残りはスクロールで閲覧 */
 #prtimes-grid {
-  max-height: 308px; /* 約7行分 */
+  max-height: 264px; /* 約6行分 */
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
@@ -575,6 +575,20 @@ body {
   width: 6px;
 }
 #prtimes-grid::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+/* TDnet(REIT物件取引)も最新6件だけ表示し、残りはスクロール */
+#disclosure-card {
+  max-height: 234px; /* 約6行分 */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+#disclosure-card::-webkit-scrollbar {
+  width: 6px;
+}
+#disclosure-card::-webkit-scrollbar-thumb {
   background: var(--border);
   border-radius: 3px;
 }

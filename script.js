@@ -490,8 +490,8 @@ async function loadREIT(force) {
         '<div class="strip-loading">直近1か月に、物件の取得・売却・賃貸借に関する開示はありませんでした。</div>';
       return;
     }
-    el.innerHTML =
-      '<div class="feed-list">' + data.items.map(reitRow).join("") + "</div>";
+    // #disclosure-card 自体が feed-list なので行を直接入れる（二重枠を回避）
+    el.innerHTML = data.items.map(reitRow).join("");
   } catch (e) {
     el.innerHTML =
       '<div class="strip-loading">開示情報を取得できませんでした（あとで再取得します）。</div>';
