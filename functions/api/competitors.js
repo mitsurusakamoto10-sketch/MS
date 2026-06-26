@@ -232,7 +232,12 @@ export async function onRequest(context) {
         const isHtml = typeof f === "object" && f.html;
         const url = isHtml ? f.html : f;
         try {
-          const res = await fetch(url, { headers: BROWSER_HEADERS, redirect: "follow" });
+          // Google Newsは同意画面リダイレクト回避のためCONSENT Cookieを付与
+          const headers = Object.assign({}, BROWSER_HEADERS);
+          if (url.indexOf("news.google.com") >= 0) {
+            headers["Cookie"] = "CONSENT=YES+cb.20211129-04-p0.en+F+060";
+          }
+          const res = await fetch(url, { headers, redirect: "follow" });
           if (!res.ok) continue;
           const text = await res.text();
           const all = isHtml ? scrapeHtml(url, text) : parseFeed(text);
