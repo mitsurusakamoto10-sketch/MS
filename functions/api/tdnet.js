@@ -75,10 +75,10 @@ export async function onRequest(context) {
   // 情報源到達性プローブ: 各取得に8秒タイムアウトを付けて並行試行
   if (reqUrl.searchParams.get("probe") === "1") {
     const targets = [
-      ["yanoshin_recent", "https://webapi.yanoshin.jp/webapi/tdnet/list/recent.json?limit=5"],
-      ["yanoshin_8960", "https://webapi.yanoshin.jp/webapi/tdnet/list/8960.json?limit=5"],
-      ["official_tdnet", "https://www.release.tdnet.info/inbs/I_list_001_20260604.html"],
-      ["kabutan_disclose", "https://kabutan.jp/disclosures/?code=8960"],
+      ["date_limit100", "https://webapi.yanoshin.jp/webapi/tdnet/list/20260604.json?limit=100"],
+      ["date_limit300", "https://webapi.yanoshin.jp/webapi/tdnet/list/20260604.json?limit=300"],
+      ["date_limit600", "https://webapi.yanoshin.jp/webapi/tdnet/list/20260604.json?limit=600"],
+      ["code8960_limit50", "https://webapi.yanoshin.jp/webapi/tdnet/list/8960.json?limit=50"],
     ];
     const out = {};
     await Promise.all(
@@ -96,7 +96,19 @@ export async function onRequest(context) {
             },
           });
           const txt = await r.text();
-          out[name] = { status: r.status, length: txt.length, head: txt.slice(0, 160) };
+          let totalCount = null;
+          let itemCount = null;
+          try {
+            const j = JSON.parse(txt);
+            totalCount = j.total_count != null ? j.total_count : null;
+            itemCount = (j.items || []).length;
+          } catch (e) {}
+          out[name] = {
+            status: r.status,
+            length: txt.length,
+            total_count: totalCount,
+            items: itemCount,
+          };
         } catch (e) {
           out[name] = { error: String(e).slice(0, 140) };
         } finally {
