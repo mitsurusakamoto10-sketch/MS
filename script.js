@@ -368,7 +368,7 @@ async function loadRelease(force) {
     }
     if (!data.items || data.items.length === 0) {
       el.innerHTML =
-        '<div class="strip-loading">直近24時間の該当ニュースは見つかりませんでした（次回更新で再取得します）。</div>';
+        '<div class="strip-loading">直近3日間の該当ニュースは見つかりませんでした（次回更新で再取得します）。</div>';
       return;
     }
     el.innerHTML = data.items.map(releaseRow).join("");
