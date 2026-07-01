@@ -133,6 +133,11 @@ function jsonResponse(body, extraHeaders) {
   });
 }
 
+// last-good キャッシュのキー（直近の成功結果を保存/取得）
+function releaseCacheKey() {
+  return new Request("https://release.local/industry-news-lastgood-v1");
+}
+
 export async function onRequest(context) {
   const reqUrl = new URL(context.request.url);
   const debugOn = reqUrl.searchParams.get("debug");
@@ -176,9 +181,18 @@ export async function onRequest(context) {
     }
 
     if (!res) {
+      // クォータ切れ(429)等でGemini呼び出し失敗：直近の成功結果(last-good)を返す
+      if (!debugOn) {
+        const cached = await caches.default.match(releaseCacheKey());
+        if (cached) {
+          const prev = await cached.json();
+          prev.stale = true;
+          return jsonResponse(prev, { "Cache-Control": "public, max-age=600" });
+        }
+      }
       const body = { items: [], error: "api_error" };
       if (debugOn) body.tries = tries;
-      return jsonResponse(body);
+      return jsonResponse(body, { "Cache-Control": "no-store" });
     }
 
     const data = await res.json();
@@ -207,15 +221,35 @@ export async function onRequest(context) {
       };
     }
 
+    // 成功かつ件数ありなら last-good として保存（クォータ切れ時のフォールバック用）
+    if (items.length > 0 && !debugOn && context.waitUntil) {
+      context.waitUntil(
+        caches.default.put(
+          releaseCacheKey(),
+          jsonResponse(body, { "Cache-Control": "max-age=604800" })
+        )
+      );
+    }
+
     return jsonResponse(body, {
-      // 毎朝8時(JST)に更新（それまではキャッシュ）
-      "Cache-Control": "public, max-age=" + secondsUntilNext8amJST(),
+      // debug時はキャッシュ無効。通常は毎朝8時まで。
+      "Cache-Control": debugOn ? "no-store" : "public, max-age=" + secondsUntilNext8amJST(),
     });
   } catch (e) {
-    return jsonResponse({
-      updatedAt: new Date().toISOString(),
-      items: [],
-      error: String(e),
-    });
+    // 例外時も last-good があれば返す
+    if (!debugOn) {
+      try {
+        const cached = await caches.default.match(releaseCacheKey());
+        if (cached) {
+          const prev = await cached.json();
+          prev.stale = true;
+          return jsonResponse(prev, { "Cache-Control": "public, max-age=600" });
+        }
+      } catch (e2) {}
+    }
+    return jsonResponse(
+      { updatedAt: new Date().toISOString(), items: [], error: String(e) },
+      { "Cache-Control": "no-store" }
+    );
   }
 }
