@@ -736,15 +736,7 @@ def build_workbook(
         )
         cell.font, cell.border, cell.number_format = bold, border, "#,##0"
 
-    # 増加率（2019年度→基準年度、基準年度→最終年度）
     asof_col = get_column_letter(2 + years.index(asof_fy))
-    last_col = get_column_letter(2 + len(years) - 1)
-    ws.cell(row=3, column=4,
-            value=f"={asof_col}{TOTAL_ROW}/B{TOTAL_ROW}").number_format = "0.0%"
-    ws.cell(row=3, column=3, value=f"{FIRST_FY}年度→{asof_fy}年度:").font = Font(size=9)
-    ws.cell(row=3, column=6,
-            value=f"={last_col}{TOTAL_ROW}/{asof_col}{TOTAL_ROW}").number_format = "0.0%"
-    ws.cell(row=3, column=5, value=f"{asof_fy}年度→{last_fy}年度:").font = Font(size=9)
 
     # ---- 円グラフ作成用（基準年度末、上位グレードから） ----
     pie_col_label = 2 + len(years) + 1   # ラベル列
