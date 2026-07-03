@@ -699,7 +699,7 @@ def build_workbook(
     HEAD_ROW = 4          # 年度ヘッダー行
     FIRST_GRADE_ROW = 5   # 不明・その他
     TOTAL_ROW = FIRST_GRADE_ROW + len(GRADES)      # 合計 (=10)
-    ADJ_ROW = TOTAL_ROW + 2                        # 看做簡易宿所(調整) 手入力行 (=12)
+    CHART_ANCHOR_ROW = TOTAL_ROW + 2               # グラフ配置の起点 (=12)
 
     ws.cell(row=3, column=1, value="棒線グラフ作成用").font = bold
     ws.cell(row=HEAD_ROW, column=1, value="")
@@ -722,10 +722,7 @@ def build_workbook(
             # 新規供給: 開業年度<=Y（未開業分の積み上げ）
             f_new = (f'SUMIFS(新規供給リスト!$D:$D,新規供給リスト!$G:$G,"{g}",'
                      f'新規供給リスト!$F:$F,"<="&{y})')
-            formula = f"={f_ex}+{f_new}"
-            if g == "不明・その他":  # 衛生行政報告例との調整を加算
-                formula += f"+{col}{ADJ_ROW}"
-            cell = ws.cell(row=r, column=2 + k, value=formula)
+            cell = ws.cell(row=r, column=2 + k, value=f"={f_ex}+{f_new}")
             cell.border = border
             cell.number_format = "#,##0"
 
@@ -738,16 +735,6 @@ def build_workbook(
             value=f"=SUM({col}{FIRST_GRADE_ROW}:{col}{FIRST_GRADE_ROW + len(GRADES) - 1})",
         )
         cell.font, cell.border, cell.number_format = bold, border, "#,##0"
-
-    ws.cell(row=ADJ_ROW, column=1, value="看做簡易宿所(調整)").font = Font(italic=True, size=9)
-    for k in range(len(years)):
-        cell = ws.cell(row=ADJ_ROW, column=2 + k, value=0)
-        cell.font = Font(italic=True, size=9)
-        cell.number_format = "#,##0"
-    ws.cell(
-        row=ADJ_ROW + 1, column=1,
-        value="※衛生行政報告例の総客室数と合わせる場合はこの行に差分を入力（不明・その他へ加算されます）",
-    ).font = Font(italic=True, size=8, color="808080")
 
     # 増加率（2019年度→基準年度、基準年度→最終年度）
     asof_col = get_column_letter(2 + years.index(asof_fy))
@@ -784,19 +771,35 @@ def build_workbook(
     # データラベルの文字色は塗りとのコントラストで選ぶ（色自体は変更しない）
     LABEL_TEXT = {"不明・その他": "000000", "D": "FFFFFF", "C": "000000",
                   "B": "000000", "A": "FFFFFF"}
+    # 系列名・カテゴリ名・凡例キーを必ずOFFにしたデータラベル（値のみ表示）。
+    # 明示しないとExcel既定で系列名/年度が一緒に出て「B:ハイクラス, 2019年度, 856」の
+    # ような重なりになるため、全フラグを固定する。
+    def value_dlbls(size: int, color: str):
+        d = DataLabelList(showVal=True, showSerName=False, showCatName=False,
+                          showLegendKey=False, showPercent=False, showBubbleSize=False,
+                          numFmt="#,##0")
+        d.txPr = txpr(size, bold=True, color=color)
+        return d
+
     chart = BarChart()
     chart.type = "col"
     chart.grouping = "stacked"
     chart.overlap = 100
-    chart.gapWidth = 40  # 棒を太くしてラベルを収まりやすくする
+    chart.gapWidth = 60
     chart.title = chart_title(
-        f"{city}全域 グレード別供給室数の推移（{FIRST_FY}年度〜{last_fy}年度）", 1400)
+        f"{city}全域 グレード別供給室数の推移（{FIRST_FY}年度〜{last_fy}年度）", 1600)
     chart.y_axis.title = "供給室数（室）"
     chart.y_axis.numFmt = "#,##0"
-    chart.y_axis.txPr = txpr(1000)
-    chart.x_axis.txPr = txpr(1050, bold=True)
-    chart.height, chart.width = 13.5, 32
+    chart.y_axis.txPr = txpr(1100)
+    chart.y_axis.majorGridlines = None  # 目盛線は既定のまま（後段でシンプルに）
+    chart.x_axis.txPr = txpr(1200, bold=True)
+    chart.x_axis.delete = False
+    chart.y_axis.delete = False
+    chart.height, chart.width = 15, 34
     cats = Reference(ws, min_col=2, max_col=1 + len(years), min_row=HEAD_ROW, max_row=HEAD_ROW)
+    # 大きい区分(不明・その他/D/C)のみ値ラベルを内側表示。薄い区分(B/A)は
+    # セグメントが細くラベルがはみ出す(=四角マーカー化する)ため、ラベルを付けない。
+    LABELED = {"不明・その他", "D", "C"}
     for gi, g in enumerate(GRADES):
         r = FIRST_GRADE_ROW + gi
         ref = Reference(ws, min_col=2, max_col=1 + len(years), min_row=r, max_row=r)
@@ -804,20 +807,25 @@ def build_workbook(
         s = chart.series[-1]
         s.tx = SeriesLabel(v=GRADE_LABELS[g])
         s.graphicalProperties.solidFill = GRADE_COLORS[g]
-        s.graphicalProperties.line.solidFill = GRADE_COLORS[g]
-        # 系列ごとのデータラベル（大きめ・太字・塗りに応じた文字色）
-        s.dLbls = DataLabelList(showVal=True, numFmt="#,##0")
-        s.dLbls.txPr = txpr(1000 if g in ("不明・その他", "D", "C") else 900,
-                            bold=True, color=LABEL_TEXT[g])
+        s.graphicalProperties.line.solidFill = "FFFFFF"  # セグメント境界を白線で明確化
+        s.graphicalProperties.line.width = 12700  # 1pt
+        if g in LABELED:
+            s.dLbls = value_dlbls(1150, LABEL_TEXT[g])
+        else:
+            # B/Aはラベルを完全に消す（全フラグOFF）
+            s.dLbls = DataLabelList(showVal=False, showSerName=False, showCatName=False,
+                                    showLegendKey=False, showPercent=False, showBubbleSize=False)
     chart.set_categories(cats)
     chart.legend.position = "b"  # 凡例は下に置いてプロット領域を広く使う
-    chart.legend.txPr = txpr(1100, bold=True)
-    ws.add_chart(chart, f"A{ADJ_ROW + 3}")
+    chart.legend.txPr = txpr(1250, bold=True)
+    chart.dLbls = DataLabelList(showVal=False, showSerName=False, showCatName=False,
+                                showLegendKey=False, showPercent=False, showBubbleSize=False)
+    ws.add_chart(chart, f"A{CHART_ANCHOR_ROW}")
 
     # ---- 円グラフ ----
     pie = PieChart()
-    pie.title = chart_title(f"{city}全域 {asof_fy + 1}/3末 グレード別供給室数割合", 1400)
-    pie.height, pie.width = 13.5, 17
+    pie.title = chart_title(f"{city}全域 {asof_fy + 1}/3末 グレード別供給室数割合", 1600)
+    pie.height, pie.width = 15, 19
     data = Reference(ws, min_col=pie_col_val, min_row=FIRST_GRADE_ROW,
                      max_row=FIRST_GRADE_ROW + len(pie_order) - 1)
     labels = Reference(ws, min_col=pie_col_label, min_row=FIRST_GRADE_ROW,
@@ -828,13 +836,17 @@ def build_workbook(
         from openpyxl.chart.series import DataPoint
         pt = DataPoint(idx=pi)
         pt.graphicalProperties.solidFill = GRADE_COLORS[g]
+        pt.graphicalProperties.line.solidFill = "FFFFFF"
+        pt.graphicalProperties.line.width = 19050  # 1.5pt 白の区切り線
         pie.series[0].data_points.append(pt)
     # %ラベルはスライスの外側に黒太字で表示（白背景上なのでどの色でも読める）
-    pie.dataLabels = DataLabelList(showPercent=True, dLblPos="outEnd")
-    pie.dataLabels.txPr = txpr(1200, bold=True)
+    pie.dataLabels = DataLabelList(showPercent=True, showVal=False, showSerName=False,
+                                   showCatName=False, showLegendKey=False,
+                                   showBubbleSize=False, dLblPos="outEnd")
+    pie.dataLabels.txPr = txpr(1400, bold=True)
     pie.legend.position = "b"
-    pie.legend.txPr = txpr(1050, bold=True)
-    ws.add_chart(pie, f"{get_column_letter(2 + len(years) + 5)}{ADJ_ROW + 3}")
+    pie.legend.txPr = txpr(1200, bold=True)
+    ws.add_chart(pie, f"{get_column_letter(2 + len(years) + 5)}{CHART_ANCHOR_ROW}")
 
     # ---- 参考タブ（入力データファイルの写し） ----
     ref_fill = PatternFill("solid", fgColor="EDEDED")
