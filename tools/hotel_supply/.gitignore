@@ -1,0 +1,12 @@
+# 社内基準・調査データ（コミット禁止・別途受け渡し）
+grade_rules.csv
+*_grade_overrides.csv
+grade_research_cache.csv
+
+# 入出力データ
+*.xlsx
+*.csv
+!*.example.csv
+
+# その他
+__pycache__/
