@@ -593,10 +593,16 @@ def build_workbook(
                         p=[Paragraph(pPr=ParagraphProperties(defRPr=cp))])
 
     def grade_validation(ws, col_letter: str, n_rows: int) -> None:
+        # showDropDown=False がExcel仕様で「セル選択時にプルダウン矢印を表示」の意味。
+        # 入力メッセージとエラー表示も有効にして、確実に選択式として機能させる。
         dv = DataValidation(
             type="list", formula1='"A,B,C,D,不明・その他"', allow_blank=True,
-            showDropDown=False,  # False=セル選択時にプルダウン矢印を表示
-            promptTitle="グレード", prompt="A/B/C/D/不明・その他 から選択",
+            showDropDown=False,
+            showInputMessage=True, promptTitle="グレード",
+            prompt="A / B / C / D / 不明・その他 から選択してください",
+            showErrorMessage=True, errorTitle="無効な値",
+            error="A / B / C / D / 不明・その他 のいずれかを選択してください",
+            errorStyle="warning",
         )
         ws.add_data_validation(dv)
         dv.add(f"{col_letter}2:{col_letter}{max(n_rows + 1, 2)}")
