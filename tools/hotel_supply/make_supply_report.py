@@ -867,6 +867,90 @@ def build_workbook(
             value=f"作成: {dt.date.today().isoformat()} / 円グラフ基準: {asof_fy}年度末 / "
                   f"リストシートのグレード・年度を修正すると自動再計算されます").font = Font(size=9, color="808080")
 
+    # ---- グレード判定フロー（自然言語の説明タブ） ----
+    ws_f = wb.create_sheet("グレード判定フロー")
+    ws_f.sheet_properties.tabColor = "2E75B6"
+    ws_f.sheet_view.showGridLines = False
+    ws_f.column_dimensions["A"].width = 3
+    ws_f.column_dimensions["B"].width = 22
+    ws_f.column_dimensions["C"].width = 66
+    ws_f.column_dimensions["D"].width = 26
+
+    step_fill = PatternFill("solid", fgColor="DDEBF7")
+    yes_fill = PatternFill("solid", fgColor="E2EFDA")   # 確定（緑）
+    unk_fill = PatternFill("solid", fgColor="FFF2CC")   # 不明・その他（黄）
+    arrow_font = Font(size=16, bold=True, color="2E75B6")
+    step_font = Font(size=11, bold=True, color="1F4E78")
+    body_font = Font(size=11)
+
+    r = 1
+    ws_f.cell(row=r, column=2, value="ホテルのグレード判定フロー").font = Font(size=16, bold=True)
+    r += 1
+    ws_f.cell(row=r, column=2,
+              value="1施設ずつ、上から順に条件をあてはめます。あてはまった時点でグレードが決まり、"
+                    "以降のステップには進みません。").font = Font(size=10, color="595959")
+    r += 2
+
+    def box(row, fill, title, body, result=""):
+        b = ws_f.cell(row=row, column=2, value=title)
+        b.fill, b.font, b.border = fill, step_font, border
+        b.alignment = Alignment(vertical="center", wrap_text=True)
+        c = ws_f.cell(row=row, column=3, value=body)
+        c.fill, c.font, c.border = fill, body_font, border
+        c.alignment = Alignment(vertical="center", wrap_text=True)
+        d = ws_f.cell(row=row, column=4, value=result)
+        d.fill, d.font, d.border = fill, Font(size=11, bold=True), border
+        d.alignment = Alignment(vertical="center", wrap_text=True)
+        ws_f.row_dimensions[row].height = 46
+
+    def arrow(row, text="↓"):
+        a = ws_f.cell(row=row, column=2, value=text)
+        a.font, a.alignment = arrow_font, Alignment(horizontal="center")
+
+    box(r, step_fill, "STEP1 施設別グレード表",
+        "「参考_施設別グレード表」に同じ施設名があるか？（過去資料からの個別指定）",
+        "→ あれば その値で確定")
+    r += 1; arrow(r); r += 1
+    box(r, step_fill, "STEP2 カテゴリー判定",
+        "カテゴリーが宿泊主体型（ビジネス／デラックス／シティ／リゾートホテル・旅館）か？\n"
+        "※新規開業予定はカテゴリー欄が無いため、この判定は行いません。",
+        "→ 対象外（ホステル・ゲストハウス・民宿・貸別荘・カプセル等）は「不明・その他」で確定")
+    r += 1; arrow(r); r += 1
+    box(r, step_fill, "STEP3 ブランド判定",
+        "「参考_ブランドグレード表」のブランド名に一致するか？（チェーン・外資ブランド）",
+        "→ 一致すれば そのグレードで確定")
+    r += 1; arrow(r); r += 1
+    box(r, step_fill, "STEP4 小規模ルール",
+        "客室数が20室未満か？（明らかに小規模なもの。既存リストのみ適用）",
+        "→ はい なら D で確定")
+    r += 1; arrow(r); r += 1
+    box(r, step_fill, "STEP5 主力客室の面積調査（AI＋Web検索）",
+        "上記で決まらない独立系ホテルは、AIがWeb（じゃらん／楽天／一休／公式HP等）を調べ、"
+        "「ボリュームゾーン＝最も室数が多い主力客室タイプ」の面積を確認します。\n"
+        "面積要件：A＝40㎡以上／B＝30㎡以上／C＝20㎡以上／D＝20㎡未満。\n"
+        "面積が不明なときのみ、補助的に販売単価を参考にします（面積を優先）。",
+        "→ 面積が分かれば 該当グレードで確定（確信度が低い場合は「要確認」を付与）")
+    r += 1; arrow(r); r += 1
+    box(r, unk_fill, "STEP6 判定不能",
+        "STEP5でも面積・単価が確認できない場合。",
+        "→「不明・その他」＋「要確認」（黄色行）。手動で確認・修正してください。")
+    r += 2
+
+    for note in [
+        "■ 確定の凡例：STEP1〜4＝ルールで自動確定、STEP5＝AI調査で確定、STEP6＝要確認。",
+        "■ 再現性：AIの調査結果は「参考_LLM調査キャッシュ」に面積・根拠・出典つきで保存され、"
+        "次回以降は同じ回答になります。判定を変えたい場合はこのキャッシュ（またはCSV）を編集します。",
+        "■ 閉業ホテルのグレードは、既存リスト側の判定を引き継いだ参考表示です"
+        "（集計では既存リストのグレードと閉業年度を使用）。",
+        "■ 各リスト（既存／新規／閉業）のグレード列はプルダウンで手修正でき、"
+        "修正すると集計表・グラフが自動で再計算されます。",
+    ]:
+        ws_f.cell(row=r, column=2, value=note).font = Font(size=10, color="595959")
+        ws_f.cell(row=r, column=2).alignment = Alignment(wrap_text=True, vertical="top")
+        ws_f.merge_cells(start_row=r, start_column=2, end_row=r, end_column=4)
+        ws_f.row_dimensions[r].height = 30
+        r += 1
+
     wb.save(out_path)
     # 参考: 上でシート名に使うため参照した n_e / n_n は行数（未使用でも保持）
     _ = n_e, n_n
