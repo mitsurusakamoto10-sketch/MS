@@ -543,6 +543,7 @@ def match_closures(existing: list[Hotel], closed: list[Hotel]) -> None:
             target.close_date = c.close_date
             target.close_fy = c.close_fy
             c.extra["matched"] = "○"
+            c.extra["target"] = target
             if c.rooms is None and target.rooms is not None:
                 c.rooms = target.rooms  # 「集計中」は既存側の部屋数で補完
         else:
@@ -561,13 +562,44 @@ def build_workbook(
     closed: list[Hotel],
     asof_fy: int,
     out_path: str,
+    ref_csvs: list[tuple[str, str | None]] | None = None,
 ) -> None:
     import openpyxl
     from openpyxl.chart import BarChart, PieChart, Reference
     from openpyxl.chart.label import DataLabelList
     from openpyxl.chart.series import SeriesLabel
+    from openpyxl.chart.text import RichText, Text
+    from openpyxl.chart.title import Title
+    from openpyxl.drawing.text import (
+        CharacterProperties, Paragraph, ParagraphProperties,
+        RegularTextRun, RichTextProperties,
+    )
     from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
     from openpyxl.utils import get_column_letter
+    from openpyxl.worksheet.datavalidation import DataValidation
+
+    # --- グラフ文字を見やすくするためのヘルパー（サイズは1/100pt単位） ---
+    def chart_title(text: str, size: int = 1400) -> Title:
+        cp = CharacterProperties(sz=size, b=True)
+        para = Paragraph(pPr=ParagraphProperties(defRPr=cp),
+                         r=[RegularTextRun(rPr=cp, t=text)])
+        return Title(tx=Text(rich=RichText(p=[para])))
+
+    def txpr(size: int, bold: bool = False, color: str | None = None) -> RichText:
+        cp = CharacterProperties(sz=size, b=bold)
+        if color:
+            cp.solidFill = color
+        return RichText(bodyPr=RichTextProperties(),
+                        p=[Paragraph(pPr=ParagraphProperties(defRPr=cp))])
+
+    def grade_validation(ws, col_letter: str, n_rows: int) -> None:
+        dv = DataValidation(
+            type="list", formula1='"A,B,C,D,不明・その他"', allow_blank=True,
+            showDropDown=False,  # False=セル選択時にプルダウン矢印を表示
+            promptTitle="グレード", prompt="A/B/C/D/不明・その他 から選択",
+        )
+        ws.add_data_validation(dv)
+        dv.add(f"{col_letter}2:{col_letter}{max(n_rows + 1, 2)}")
 
     last_fy = max(
         [asof_fy]
@@ -617,6 +649,7 @@ def build_workbook(
         if ws_e.cell(row=i, column=12).value:
             for j in range(1, 13):
                 ws_e.cell(row=i, column=j).fill = review_fill
+    grade_validation(ws_e, "J", len(existing))
     n_e = len(existing) + 1
 
     # ---- 新規供給リスト ----
@@ -635,6 +668,7 @@ def build_workbook(
         if h.needs_review:
             for j in range(1, 10):
                 ws_n.cell(row=i, column=j).fill = review_fill
+    grade_validation(ws_n, "G", len(new_supply))
     n_n = max(len(new_supply) + 1, 2)
 
     # ---- 閉業リスト（参考） ----
@@ -644,10 +678,12 @@ def build_workbook(
         h.rooms if h.rooms is not None else "集計中",
         h.close_date.isoformat() if h.close_date else "",
         h.close_fy if h.close_fy != NO_CLOSE_FY else "",
+        h.grade,
         h.extra.get("matched", ""),
     ] for h in closed]
-    write_table(ws_c, ["閉業施設名", "住所", "カテゴリー", "部屋数", "閉業日", "閉業年度", "既存リスト突合"],
-                rows_data, [38, 34, 12, 8, 11, 9, 13])
+    write_table(ws_c, ["閉業施設名", "住所", "カテゴリー", "部屋数", "閉業日", "閉業年度", "グレード", "既存リスト突合"],
+                rows_data, [38, 34, 12, 8, 11, 9, 12, 13])
+    grade_validation(ws_c, "G", len(closed))
 
     # ---- 集計・グラフシート ----
     ws = wb.create_sheet(f"{city} 供給数推移", 0)
@@ -739,14 +775,21 @@ def build_workbook(
     tcell.font, tcell.number_format = bold, "#,##0"
 
     # ---- 積み上げ棒グラフ ----
+    # データラベルの文字色は塗りとのコントラストで選ぶ（色自体は変更しない）
+    LABEL_TEXT = {"不明・その他": "000000", "D": "FFFFFF", "C": "000000",
+                  "B": "000000", "A": "FFFFFF"}
     chart = BarChart()
     chart.type = "col"
     chart.grouping = "stacked"
     chart.overlap = 100
-    chart.title = f"{city}全域 グレード別供給室数の推移（{FIRST_FY}年度〜{last_fy}年度）"
+    chart.gapWidth = 40  # 棒を太くしてラベルを収まりやすくする
+    chart.title = chart_title(
+        f"{city}全域 グレード別供給室数の推移（{FIRST_FY}年度〜{last_fy}年度）", 1400)
     chart.y_axis.title = "供給室数（室）"
     chart.y_axis.numFmt = "#,##0"
-    chart.height, chart.width = 11, 26
+    chart.y_axis.txPr = txpr(1000)
+    chart.x_axis.txPr = txpr(1050, bold=True)
+    chart.height, chart.width = 13.5, 32
     cats = Reference(ws, min_col=2, max_col=1 + len(years), min_row=HEAD_ROW, max_row=HEAD_ROW)
     for gi, g in enumerate(GRADES):
         r = FIRST_GRADE_ROW + gi
@@ -756,16 +799,19 @@ def build_workbook(
         s.tx = SeriesLabel(v=GRADE_LABELS[g])
         s.graphicalProperties.solidFill = GRADE_COLORS[g]
         s.graphicalProperties.line.solidFill = GRADE_COLORS[g]
+        # 系列ごとのデータラベル（大きめ・太字・塗りに応じた文字色）
+        s.dLbls = DataLabelList(showVal=True, numFmt="#,##0")
+        s.dLbls.txPr = txpr(1000 if g in ("不明・その他", "D", "C") else 900,
+                            bold=True, color=LABEL_TEXT[g])
     chart.set_categories(cats)
-    chart.dataLabels = DataLabelList()
-    chart.dataLabels.showVal = True
-    chart.dataLabels.numFmt = "#,##0"
+    chart.legend.position = "b"  # 凡例は下に置いてプロット領域を広く使う
+    chart.legend.txPr = txpr(1100, bold=True)
     ws.add_chart(chart, f"A{ADJ_ROW + 3}")
 
     # ---- 円グラフ ----
     pie = PieChart()
-    pie.title = f"{city}全域 {asof_fy + 1}/3末 グレード別供給室数割合"
-    pie.height, pie.width = 11, 14
+    pie.title = chart_title(f"{city}全域 {asof_fy + 1}/3末 グレード別供給室数割合", 1400)
+    pie.height, pie.width = 13.5, 17
     data = Reference(ws, min_col=pie_col_val, min_row=FIRST_GRADE_ROW,
                      max_row=FIRST_GRADE_ROW + len(pie_order) - 1)
     labels = Reference(ws, min_col=pie_col_label, min_row=FIRST_GRADE_ROW,
@@ -777,9 +823,34 @@ def build_workbook(
         pt = DataPoint(idx=pi)
         pt.graphicalProperties.solidFill = GRADE_COLORS[g]
         pie.series[0].data_points.append(pt)
-    pie.dataLabels = DataLabelList()
-    pie.dataLabels.showPercent = True
+    # %ラベルはスライスの外側に黒太字で表示（白背景上なのでどの色でも読める）
+    pie.dataLabels = DataLabelList(showPercent=True, dLblPos="outEnd")
+    pie.dataLabels.txPr = txpr(1200, bold=True)
+    pie.legend.position = "b"
+    pie.legend.txPr = txpr(1050, bold=True)
     ws.add_chart(pie, f"{get_column_letter(2 + len(years) + 5)}{ADJ_ROW + 3}")
+
+    # ---- 参考タブ（入力データファイルの写し） ----
+    ref_fill = PatternFill("solid", fgColor="EDEDED")
+    for sheet_name, csv_path in (ref_csvs or []):
+        ws_r = wb.create_sheet(sheet_name)
+        ws_r.sheet_properties.tabColor = "808080"
+        if not csv_path or not os.path.exists(csv_path):
+            ws_r.cell(row=1, column=1, value="（対応するデータファイルが指定されていません）")
+            continue
+        with open(csv_path, newline="", encoding="utf-8-sig") as f:
+            for i, row in enumerate(csv.reader(f), start=1):
+                for j, v in enumerate(row, start=1):
+                    c = ws_r.cell(row=i, column=j, value=v)
+                    if i == 1:
+                        c.font, c.fill, c.border = bold, ref_fill, border
+        ws_r.freeze_panes = "A2"
+        for j in range(1, ws_r.max_column + 1):
+            ws_r.column_dimensions[get_column_letter(j)].width = 24
+        ws_r.cell(row=ws_r.max_row + 2, column=1,
+                  value=f"※このタブは {os.path.basename(csv_path)} の写し（参考）。"
+                        f"判定を変える場合は元のCSVを編集して再実行してください。"
+                  ).font = Font(italic=True, size=9, color="808080")
 
     # メモ
     ws.cell(row=2, column=1,
@@ -845,9 +916,6 @@ def main() -> int:
     print(f"  ブランド規則 {len(rules)}件 / オーバーライド {len(overrides)}件")
     un_e = classify(existing, rules, overrides, prefer_scope)
     un_n = classify(new_supply, rules, overrides, prefer_scope, is_new_supply=True)
-    # 閉業リストのグレードは参考表示のみ（集計は既存リスト側の閉業年度で行う）
-    for c in closed:
-        c.grade = overrides.get(c.norm, "")
     unresolved = un_e + un_n
     print(f"  未確定: 既存 {len(un_e)}件 / 新規 {len(un_n)}件")
     if args.list_unresolved:
@@ -858,6 +926,11 @@ def main() -> int:
     print(f"[4/5] Step1.5 LLM調査（キャッシュ: {args.research_cache}）")
     research_step(unresolved, args.city, args.research_cache, args.llm_model,
                   use_llm=not args.no_llm, refresh=args.refresh_research)
+
+    # 閉業リストのグレードは参考表示（集計は既存リスト側の閉業年度で行う）
+    for c in closed:
+        target = c.extra.get("target")
+        c.grade = target.grade if target is not None else overrides.get(c.norm, "")
 
     # 同名重複の検出（メトロエンジンのデータに稀に重複掲載があるため、二重計上の疑いを警告）
     seen: dict[str, Hotel] = {}
@@ -872,9 +945,14 @@ def main() -> int:
         else:
             seen[h.norm] = h
 
-    out = args.output or f"供給レポート_{args.city}_{today.strftime('%Y%m%d')}.xlsx"
+    out = args.output or f"{today.strftime('%Y%m%d')}_供給レポート_{args.city}.xlsx"
     print(f"[5/5] Excel生成: {out}")
-    build_workbook(args.city, existing, new_supply, closed, asof_fy, out)
+    build_workbook(args.city, existing, new_supply, closed, asof_fy, out,
+                   ref_csvs=[
+                       ("参考_ブランドグレード表", args.grade_rules),
+                       ("参考_施設別グレード表", args.grade_overrides),
+                       ("参考_LLM調査キャッシュ", args.research_cache),
+                   ])
 
     review = sum(1 for h in existing + new_supply if h.needs_review)
     print(f"完了。要確認 {review}件（リストシートの黄色行）。"
