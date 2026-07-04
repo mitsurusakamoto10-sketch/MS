@@ -1,0 +1,58 @@
+name: hotel-map
+
+on:
+  workflow_dispatch:
+    inputs:
+      market:
+        description: "マーケット名（スライド見出しに使用）"
+        required: false
+        default: "那覇市"
+  push:
+    paths:
+      - "data/hotels.csv"
+      - "hotel-map/**"
+      - ".github/workflows/hotel-map.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: hotel-map-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r hotel-map/requirements.txt
+
+      - name: Build PPTX
+        run: python hotel-map/build.py --market "${{ github.event.inputs.market || '那覇市' }}"
+
+      - name: Commit outputs back to the branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add output/ data/geocode_cache.csv
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: ベンチマークホテルPPTXを自動生成 [skip ci]"
+            git push
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-hotels-pptx
+          path: |
+            output/benchmark_hotels.pptx
+            output/map.png
+            output/geocoded.csv
