@@ -61,3 +61,8 @@ python hotel-map/build.py --csv data/hotels.csv --market 那覇市
 - 地図画像には OSM の利用規約に基づき「© OpenStreetMap contributors」を表示しています。資料から削除しないでください
 - Google Maps の地図画像は無料利用に制約があるため使用していません（見た目が近い OpenStreetMap を採用）
 - 国土地理院APIの精度は概ね街区レベルです。番地レベルで数十mずれる場合は上記の手動補正を使ってください
+
+## さらに詳しく
+
+- **VSCodeでの実装・運用ガイド（詳細）**: [`docs/BMH_MAPPING.md`](../docs/BMH_MAPPING.md)
+- **Claude Codeスキル**: このリポジトリでは `/bmh-mapping` で本ワークフローを起動できます（`.claude/skills/bmh-mapping/SKILL.md`）
