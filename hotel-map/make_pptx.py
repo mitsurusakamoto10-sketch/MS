@@ -33,9 +33,10 @@ DEFAULT_COLOR = RGBColor(0x6B, 0x72, 0x80)
 DARK = RGBColor(0x1F, 0x29, 0x37)
 GRAY = RGBColor(0x6B, 0x72, 0x80)
 WHITE = RGBColor(0xFF, 0xFF, 0xFF)
+PIN_COLOR = RGBColor(0x25, 0x63, 0xEB)  # マップページのピンは単色（青）で統一
 
-# マップスライドのレイアウト（インチ）
-MAP_LEFT, MAP_TOP, MAP_H_IN = 0.25, 1.0, 6.25
+# マップスライドのレイアウト（インチ）。地図枠は 8.0in×6.2in 固定（render_mapのアスペクトと一致）
+MAP_LEFT, MAP_TOP, MAP_H_IN = 0.25, 1.0, 6.2
 
 
 def cat_color(category):
@@ -143,7 +144,7 @@ def add_map_slide(prs, rows, map_png, meta, market):
             continue
         x_in, y_in = latlon_to_slide_inches(float(row["緯度"]), float(row["経度"]),
                                             meta, map_w_in, MAP_H_IN)
-        add_pin(slide, x_in, y_in, i, cat_color(row.get("カテゴリー")))
+        add_pin(slide, x_in, y_in, i, PIN_COLOR)
 
     # 右側パネル: 凡例テーブル
     panel_left = MAP_LEFT + map_w_in + 0.25
@@ -178,8 +179,8 @@ def add_map_slide(prs, rows, map_png, meta, market):
             cell.vertical_anchor = MSO_ANCHOR.MIDDLE
             cell.fill.solid()
             cell.fill.fore_color.rgb = WHITE if i % 2 else RGBColor(0xF3, 0xF4, 0xF6)
-            if c == 0:  # No列はピンと同じ色で塗る
-                cell.fill.fore_color.rgb = cat_color(row.get("カテゴリー"))
+            if c == 0:  # No列はピンと同じ色（単色）で塗る
+                cell.fill.fore_color.rgb = PIN_COLOR
             p = cell.text_frame.paragraphs[0]
             p.alignment = PP_ALIGN.CENTER if c != 1 else PP_ALIGN.LEFT
             style_run(p.add_run(), 8.5, c == 0, WHITE if c == 0 else DARK)
@@ -187,26 +188,11 @@ def add_map_slide(prs, rows, map_png, meta, market):
         tbl.rows[i].height = Inches(0.28)
     tbl.rows[0].height = Inches(0.28)
 
-    # カテゴリー凡例（テーブルの下）
-    legend_top = MAP_TOP + 0.28 * (n + 1) + 0.25
-    cats = []
-    for row in rows:
-        c = (row.get("カテゴリー") or "").strip()
-        if c and c not in cats:
-            cats.append(c)
-    for j, cat in enumerate(cats):
-        y = legend_top + j * 0.3
-        dot = slide.shapes.add_shape(MSO_SHAPE.OVAL, Inches(panel_left), Inches(y),
-                                     Inches(0.18), Inches(0.18))
-        dot.fill.solid()
-        dot.fill.fore_color.rgb = cat_color(cat)
-        dot.line.fill.background()
-        dot.shadow.inherit = False
-        add_textbox(slide, panel_left + 0.28, y - 0.02, 3.0, 0.25, cat, 10)
-
+    # 位置特定できなかった施設の注記（テーブルの下）
+    notice_top = MAP_TOP + 0.28 * (n + 1) + 0.2
     missing = [f"{i}. {r.get('施設名')}" for i, r in enumerate(rows, 1) if not r.get("緯度")]
     if missing:
-        add_textbox(slide, panel_left, legend_top + len(cats) * 0.3 + 0.15, panel_w, 0.8,
+        add_textbox(slide, panel_left, notice_top, panel_w, 0.8,
                     "※位置特定不可: " + "、".join(missing), 8, False, GRAY)
     return slide
 

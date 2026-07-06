@@ -21,9 +21,11 @@ from common import OUTPUT_DIR, lonlat_to_world, world_to_pixel
 TILE_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
 USER_AGENT = "hotel-benchmark-map/0.1 (GitHub Actions; internal benchmark material)"
 TILE_SIZE = 256
-MAP_W, MAP_H = 1660, 1330   # PPT上の地図エリア(約8.3in×6.65in @200dpi)に合わせた縦横比
-MARGIN_PX = 110             # 端のピンが切れないよう余白を確保
-MAX_ZOOM, MIN_ZOOM = 17, 5
+OUT_ASPECT = 8.0 / 6.2      # PPT地図枠(8.0in×6.2in)の縦横比。地図はこの比率で出力する
+PAD_FRAC = 0.15            # 施設群の外側に付ける余白（bboxの大きい方の辺に対する割合）
+MIN_PAD_PX = 60            # 施設が1点/近接のときの最小余白（選択ズームでのpx）
+MAX_CANVAS_PX = 2200       # キャンバス幅の上限（これ以下で最大の整数ズームを選ぶ＝拡大優先）
+MAX_ZOOM, MIN_ZOOM = 18, 5
 
 
 def read_points(geocoded_csv):
@@ -37,18 +39,42 @@ def read_points(geocoded_csv):
     return pts
 
 
-def choose_zoom(pts):
-    """全ポイントが余白込みで画像に収まる最大ズームを選ぶ"""
+def choose_view(pts):
+    """施設バウンディングボックスに合わせてズームとキャンバスを決める。
+
+    余白過多を避けるため、固定キャンバスに整数ズームを合わせるのではなく、
+    施設群のbbox＋余白を『枠いっぱい』に収める最大の整数ズームを選び、
+    キャンバスサイズをそのbboxに合わせて切り出す。
+    戻り値: (zoom, center_px_x, center_px_y, width_px, height_px)
+    """
     ws = [lonlat_to_world(lon, lat) for lat, lon in pts]
+    wx0, wx1 = min(w[0] for w in ws), max(w[0] for w in ws)
+    wy0, wy1 = min(w[1] for w in ws), max(w[1] for w in ws)
+    wcx, wcy = (wx0 + wx1) / 2, (wy0 + wy1) / 2
+
     for z in range(MAX_ZOOM, MIN_ZOOM - 1, -1):
-        xs = [world_to_pixel(wx, wy, z)[0] for wx, wy in ws]
-        ys = [world_to_pixel(wx, wy, z)[1] for wx, wy in ws]
-        if (max(xs) - min(xs)) <= MAP_W - 2 * MARGIN_PX and (max(ys) - min(ys)) <= MAP_H - 2 * MARGIN_PX:
-            return z, (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2
+        scale = TILE_SIZE * (2 ** z)
+        span_x = (wx1 - wx0) * scale
+        span_y = (wy1 - wy0) * scale
+        pad = max(PAD_FRAC * max(span_x, span_y), MIN_PAD_PX)
+        need_w = span_x + 2 * pad
+        need_h = span_y + 2 * pad
+        # 出力アスペクト比に合わせて短辺側を広げる
+        canvas_w = max(need_w, need_h * OUT_ASPECT)
+        canvas_h = canvas_w / OUT_ASPECT
+        if canvas_w <= MAX_CANVAS_PX:
+            cx, cy = wcx * scale, wcy * scale
+            return z, cx, cy, int(round(canvas_w)), int(round(canvas_h))
+
+    # 施設が広範囲すぎる場合は最小ズームで全体を収める
     z = MIN_ZOOM
-    xs = [world_to_pixel(wx, wy, z)[0] for wx, wy in ws]
-    ys = [world_to_pixel(wx, wy, z)[1] for wx, wy in ws]
-    return z, (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2
+    scale = TILE_SIZE * (2 ** z)
+    span_x = (wx1 - wx0) * scale
+    span_y = (wy1 - wy0) * scale
+    pad = max(PAD_FRAC * max(span_x, span_y), MIN_PAD_PX)
+    canvas_w = max(span_x + 2 * pad, (span_y + 2 * pad) * OUT_ASPECT)
+    canvas_h = canvas_w / OUT_ASPECT
+    return z, wcx * scale, wcy * scale, int(round(canvas_w)), int(round(canvas_h))
 
 
 def fetch_tile(session, z, x, y):
@@ -62,14 +88,14 @@ def fetch_tile(session, z, x, y):
     return Image.open(io.BytesIO(resp.content)).convert("RGB")
 
 
-def render(z, cx, cy):
-    """中心ピクセル(cx,cy)・ズームzでMAP_W×MAP_Hの地図を合成"""
-    left, top = cx - MAP_W / 2, cy - MAP_H / 2
+def render(z, cx, cy, width, height):
+    """中心ピクセル(cx,cy)・ズームzで width×height の地図を合成"""
+    left, top = cx - width / 2, cy - height / 2
     tx0, ty0 = int(math.floor(left / TILE_SIZE)), int(math.floor(top / TILE_SIZE))
-    tx1, ty1 = int(math.floor((left + MAP_W) / TILE_SIZE)), int(math.floor((top + MAP_H) / TILE_SIZE))
+    tx1, ty1 = int(math.floor((left + width) / TILE_SIZE)), int(math.floor((top + height) / TILE_SIZE))
     n_tiles = (tx1 - tx0 + 1) * (ty1 - ty0 + 1)
-    print(f"zoom={z}, tiles={n_tiles}")
-    img = Image.new("RGB", (MAP_W, MAP_H), "#eeeeee")
+    print(f"zoom={z}, canvas={width}x{height}, tiles={n_tiles}")
+    img = Image.new("RGB", (width, height), "#eeeeee")
     session = requests.Session()
     for ty in range(ty0, ty1 + 1):
         for tx in range(tx0, tx1 + 1):
@@ -80,18 +106,18 @@ def render(z, cx, cy):
     draw = ImageDraw.Draw(img, "RGBA")
     text = "(c) OpenStreetMap contributors"
     tw = draw.textlength(text) + 12
-    draw.rectangle([MAP_W - tw, MAP_H - 20, MAP_W, MAP_H], fill=(255, 255, 255, 200))
-    draw.text((MAP_W - tw + 6, MAP_H - 16), text, fill=(60, 60, 60))
+    draw.rectangle([width - tw, height - 20, width, height], fill=(255, 255, 255, 200))
+    draw.text((width - tw + 6, height - 16), text, fill=(60, 60, 60))
     return img
 
 
 def main(geocoded_csv, out_png, out_meta):
     pts = read_points(geocoded_csv)
-    z, cx, cy = choose_zoom(pts)
-    img = render(z, cx, cy)
+    z, cx, cy, width, height = choose_view(pts)
+    img = render(z, cx, cy, width, height)
     img.save(out_png)
     meta = {"zoom": z, "center_px_x": cx, "center_px_y": cy,
-            "width_px": MAP_W, "height_px": MAP_H}
+            "width_px": width, "height_px": height}
     Path(out_meta).write_text(json.dumps(meta, indent=2), encoding="utf-8")
     print(f"出力: {out_png}, {out_meta}")
 
