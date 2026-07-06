@@ -202,11 +202,28 @@ def add_map_slide(prs, rows, map_png, meta, market):
 def add_table_slide(prs, rows, market):
     slide = blank_slide(prs)
     add_textbox(slide, 0.25, 0.2, 12.0, 0.5, f"{market}｜ベンチマークホテル一覧", 22, True)
-    headers = ["No", "施設名", "カテゴリー", "部屋数", "開業年", "プライス・インデックス(円)", "住所"]
-    widths = [0.5, 3.0, 1.4, 0.8, 0.9, 2.0, 4.2]
+
+    # 全データにプライス・インデックスが無ければ列を省く（空列を出さない）
+    has_price = any((r.get("プライス・インデックス") or "").strip() for r in rows)
+
+    # 列定義: (見出し, 幅in, 揃え, 値関数)。price列が無い分の幅は施設名・住所に配分
+    columns = [
+        ("No", 0.5, PP_ALIGN.CENTER, lambda i, r: str(i)),
+        ("施設名", 3.0 if has_price else 3.7, PP_ALIGN.LEFT, lambda i, r: r.get("施設名", "")),
+        ("カテゴリー", 1.4, PP_ALIGN.CENTER, lambda i, r: r.get("カテゴリー", "")),
+        ("部屋数", 0.8, PP_ALIGN.CENTER, lambda i, r: (r.get("部屋数") or "-")),
+        ("開業年", 0.9, PP_ALIGN.CENTER, lambda i, r: opening_year(r.get("開業"))),
+    ]
+    if has_price:
+        columns.append(("プライス・インデックス(円)", 2.0, PP_ALIGN.LEFT,
+                        lambda i, r: r.get("プライス・インデックス", "")))
+    columns.append(("住所", 4.2 if has_price else 4.5, PP_ALIGN.LEFT, lambda i, r: r.get("住所", "")))
+
+    headers = [c[0] for c in columns]
+    widths = [c[1] for c in columns]
     n = len(rows)
     total_w = sum(widths)
-    tbl_shape = slide.shapes.add_table(n + 1, len(headers), Inches(0.25), Inches(0.95),
+    tbl_shape = slide.shapes.add_table(n + 1, len(columns), Inches(0.25), Inches(0.95),
                                        Inches(total_w), Inches(0.32 * (n + 1)))
     tbl = tbl_shape.table
     for c, w in enumerate(widths):
@@ -221,22 +238,20 @@ def add_table_slide(prs, rows, market):
         style_run(p.add_run(), 9.5, True, WHITE)
         p.runs[0].text = h
     for i, row in enumerate(rows, 1):
-        rooms = row.get("部屋数", "")
-        values = [str(i), row.get("施設名", ""), row.get("カテゴリー", ""),
-                  f"{rooms}" if rooms else "-", opening_year(row.get("開業")),
-                  row.get("プライス・インデックス", ""), row.get("住所", "")]
-        for c, v in enumerate(values):
+        for c, (_, _, align, fn) in enumerate(columns):
             cell = tbl.cell(i, c)
             cell.vertical_anchor = MSO_ANCHOR.MIDDLE
             cell.fill.solid()
             cell.fill.fore_color.rgb = WHITE if i % 2 else RGBColor(0xF3, 0xF4, 0xF6)
             p = cell.text_frame.paragraphs[0]
-            p.alignment = PP_ALIGN.CENTER if c in (0, 3, 4) else PP_ALIGN.LEFT
+            p.alignment = align
             style_run(p.add_run(), 9, False, DARK)
-            p.runs[0].text = v
+            p.runs[0].text = fn(i, row)
         tbl.rows[i].height = Inches(0.32)
-    add_textbox(slide, 0.25, 7.05, 12.8, 0.3,
-                "出典: 各施設公表情報等 ／ プライス・インデックスは調査時点の参考価格帯", 8.5, False, GRAY)
+    note = "出典: 各施設公表情報等"
+    if has_price:
+        note += " ／ プライス・インデックスは調査時点の参考価格帯"
+    add_textbox(slide, 0.25, 7.05, 12.8, 0.3, note, 8.5, False, GRAY)
     return slide
 
 
