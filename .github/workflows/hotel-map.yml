@@ -34,7 +34,12 @@ jobs:
         run: pip install -r hotel-map/requirements.txt
 
       - name: Build PPTX
-        run: python hotel-map/build.py --market "${{ github.event.inputs.market || '那覇市' }}"
+        run: |
+          MARKET="${{ github.event.inputs.market }}"
+          if [ -z "$MARKET" ] && [ -f data/market.txt ]; then MARKET="$(head -n1 data/market.txt | tr -d '\r\n')"; fi
+          if [ -z "$MARKET" ]; then MARKET="那覇市"; fi
+          echo "market = $MARKET"
+          python hotel-map/build.py --csv data/hotels.csv --market "$MARKET"
 
       - name: Commit outputs back to the branch
         run: |
