@@ -477,7 +477,11 @@ async function loadREIT(force) {
   try {
     // force=true のときはキャッシュを避け、その時点でTDnet(適時開示)を再取得する
     const url = force ? "/api/tdnet?fresh=1&t=" + Date.now() : "/api/tdnet";
-    const res = await fetch(url, { cache: "no-store" });
+    // 40秒で打ち切り（「読み込み中…」のまま固まらないように）
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 40000);
+    const res = await fetch(url, { cache: "no-store", signal: ctrl.signal });
+    clearTimeout(timer);
     if (!res.ok) throw new Error("status " + res.status);
     const data = await res.json();
     if (data.error === "no_api_key") {

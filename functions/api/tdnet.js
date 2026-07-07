@@ -92,62 +92,64 @@ export async function onRequest(context) {
 
   const dayStatus = {};
 
-  // 1日分を取得（8秒タイムアウト＋1回リトライ）。投資法人の開示だけ返す。
+  // 1日分を取得（6秒タイムアウト・リトライ無し）。取れない日はスキップ。
   async function fetchDay(date) {
     const url =
       "https://webapi.yanoshin.jp/webapi/tdnet/list/" + date + ".json?limit=" + PER_DAY_LIMIT;
-    for (let attempt = 0; attempt < 2; attempt++) {
-      const ctrl = new AbortController();
-      const to = setTimeout(() => ctrl.abort(), 8000);
-      try {
-        const res = await fetch(url, {
-          signal: ctrl.signal,
-          headers: {
-            "User-Agent":
-              "Mozilla/5.0 (compatible; MyPortal/1.0; +https://myworkportal.pages.dev)",
-            Accept: "application/json",
-          },
-        });
-        clearTimeout(to);
-        if (!res.ok) {
-          if (attempt === 0) continue;
-          dayStatus[date] = "status " + res.status;
-          return [];
-        }
-        const data = await res.json();
-        const items = (data && data.items) || [];
-        // 全開示を取り込み（REIT判定・物件判定は後段）。社名・コードも保持。
-        const list = items
-          .map(rec)
-          .filter((t) => t && t.title)
-          .map((t) => ({
-            company: t.company_name || "",
-            code: t.company_code || "",
-            title: t.title,
-            pubdate: t.pubdate || "",
-            ts: Date.parse((t.pubdate || "").replace(" ", "T") + "+09:00"),
-            link: t.document_url || t.url || "",
-          }));
-        dayStatus[date] = {
-          total: items.length,
-          reitProp: list.filter((x) => isReit(x.company) && isPropertyDeal(x.title)).length,
-        };
-        return list;
-      } catch (e) {
-        clearTimeout(to);
-        if (attempt === 0) continue;
-        dayStatus[date] = "err";
+    const ctrl = new AbortController();
+    const to = setTimeout(() => ctrl.abort(), 6000);
+    try {
+      const res = await fetch(url, {
+        signal: ctrl.signal,
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (compatible; MyPortal/1.0; +https://myworkportal.pages.dev)",
+          Accept: "application/json",
+        },
+      });
+      clearTimeout(to);
+      if (!res.ok) {
+        dayStatus[date] = "status " + res.status;
         return [];
       }
+      const data = await res.json();
+      const items = (data && data.items) || [];
+      // 全開示を取り込み（REIT判定・物件判定は後段）。社名・コードも保持。
+      const list = items
+        .map(rec)
+        .filter((t) => t && t.title)
+        .map((t) => ({
+          company: t.company_name || "",
+          code: t.company_code || "",
+          title: t.title,
+          pubdate: t.pubdate || "",
+          ts: Date.parse((t.pubdate || "").replace(" ", "T") + "+09:00"),
+          link: t.document_url || t.url || "",
+        }));
+      dayStatus[date] = {
+        total: items.length,
+        reitProp: list.filter((x) => isReit(x.company) && isPropertyDeal(x.title)).length,
+      };
+      return list;
+    } catch (e) {
+      clearTimeout(to);
+      dayStatus[date] = "err";
+      return [];
     }
-    return [];
   }
 
   try {
-    // やのしんへの負荷を抑えるため、6並列ずつのバッチで取得
+    // 10並列バッチで取得。全体20秒の予算を超えたら残りをスキップして
+    // 「取れた分」で返す（ブラウザが読み込み中のまま固まるのを防ぐ）。
+    const started = Date.now();
+    const TOTAL_BUDGET_MS = 20000;
     const lists = [];
-    const CONC = 6;
+    const CONC = 10;
     for (let i = 0; i < dates.length; i += CONC) {
+      if (Date.now() - started > TOTAL_BUDGET_MS) {
+        for (const d of dates.slice(i)) dayStatus[d] = "skipped(budget)";
+        break;
+      }
       const part = await Promise.all(dates.slice(i, i + CONC).map(fetchDay));
       lists.push.apply(lists, part);
     }
