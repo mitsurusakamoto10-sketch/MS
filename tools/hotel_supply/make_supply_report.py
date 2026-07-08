@@ -74,6 +74,12 @@ UNKNOWN_OPEN_FY = 1900   # 開業日不明（=2019年度以前開業とみなす
 # 面積要件（㎡）: この値以上でそのグレード（マニュアル2023年度改定版）
 AREA_THRESHOLDS = [("A", 40.0), ("B", 30.0), ("C", 20.0)]  # 20未満はD
 
+# 単価帯要件（円）: プライス・インデックスの中央値がこの値以上でそのグレード。
+# リゾート/温泉旅館市場向けの既定値（客室単価=2食付・複数名の総額を想定）。
+# 都市型ホテル市場では面積基準の方が適合するため、--price-grade 指定時のみ使用。
+# --price-thresholds "A,B,C" で上書き可能（例: "90000,45000,20000"）。
+PRICE_THRESHOLDS = [("A", 90000), ("B", 45000), ("C", 20000)]  # 20000未満はD
+
 RESEARCH_CACHE_HEADER = [
     "正規化キー", "施設名", "市町村区", "調査日", "主力客室面積_m2",
     "判定グレード", "確信度", "根拠", "出典",
@@ -343,14 +349,34 @@ def grade_by_area(area: float) -> str:
     return "D"
 
 
+def price_midpoint(price_index: str) -> int | None:
+    """プライス・インデックス（例「25,001 - 30,000」）の中央値を返す。"""
+    nums = [int(n.replace(",", "")) for n in re.findall(r"[\d,]+", price_index or "")]
+    if not nums:
+        return None
+    return sum(nums) // len(nums)
+
+
+def grade_by_price(mid: int, thresholds) -> str:
+    for g, th in thresholds:
+        if mid >= th:
+            return g
+    return "D"
+
+
 def classify(
     hotels: list[Hotel],
     rules,
     overrides: dict[str, str],
     prefer_scope: str,
     is_new_supply: bool = False,
+    price_thresholds=None,
 ) -> list[Hotel]:
-    """LLM調査を除くルールベースの分類。未確定は grade='' のまま返す。"""
+    """LLM調査を除くルールベースの分類。未確定は grade='' のまま返す。
+
+    price_thresholds を渡すと（リゾート/温泉市場向け）、ブランド判定の後・LLM調査の前に
+    「客室単価帯」でグレードを付ける。単価帯は小規模ルールより優先（小さな高級旅館対策）。
+    """
     unresolved = []
     for h in hotels:
         # (1) オーバーライド
@@ -367,6 +393,13 @@ def classify(
         if bm:
             h.grade, h.grade_reason = bm[0], f"ブランド({bm[1]})"
             continue
+        # (3.5) 単価帯判定（リゾート/温泉市場モード。面積が実態を反映しないため）
+        if price_thresholds is not None:
+            mid = price_midpoint(h.price_index)
+            if mid is not None:
+                h.grade = grade_by_price(mid, price_thresholds)
+                h.grade_reason = f"単価帯({mid:,}円)"
+                continue
         # (4) 小規模ルール（既存のみ。新規供給は計画段階のためLLM調査へ回す）
         if not is_new_supply and h.rooms is not None and h.rooms < 20:
             h.grade, h.grade_reason = "D", f"小規模({h.rooms}室<20室)"
@@ -978,6 +1011,12 @@ def main() -> int:
     p.add_argument("--no-llm", action="store_true", help="LLM調査を行わない（キャッシュのみ使用）")
     p.add_argument("--refresh-research", action="store_true", help="キャッシュを無視して再調査する")
     p.add_argument("--llm-model", default="claude-opus-4-8", help="調査に使うClaudeモデルID")
+    p.add_argument("--price-grade", action="store_true",
+                   help="リゾート/温泉市場向け: ブランド判定後、客室単価帯でグレードを付ける"
+                        "（面積が実態を反映しない旅館主体マーケット向け）")
+    p.add_argument("--price-thresholds", default=None,
+                   help='単価帯の閾値をA,B,Cの順で指定（例 "90000,45000,20000"）。'
+                        "既定はリゾート向け 90000/45000/20000。")
     p.add_argument("--list-unresolved", action="store_true",
                    help="LLM調査対象（ルールで未確定の施設）を表示して終了")
     args = p.parse_args()
@@ -992,6 +1031,14 @@ def main() -> int:
         asof_fy = fiscal_year(today) - 1  # 直近の完了年度
 
     prefer_scope = "東京横浜" if any(k in args.city for k in ("東京", "横浜")) else "全国"
+
+    price_thresholds = None
+    if args.price_grade:
+        if args.price_thresholds:
+            a, b, c = (int(x.replace(",", "").strip()) for x in args.price_thresholds.split(","))
+            price_thresholds = [("A", a), ("B", b), ("C", c)]
+        else:
+            price_thresholds = PRICE_THRESHOLDS
 
     print(f"[1/5] CSV読込: {args.city}")
     existing = load_existing(args.existing)
@@ -1008,8 +1055,12 @@ def main() -> int:
     rules = load_grade_rules(args.grade_rules)
     overrides = load_overrides(args.grade_overrides)
     print(f"  ブランド規則 {len(rules)}件 / オーバーライド {len(overrides)}件")
-    un_e = classify(existing, rules, overrides, prefer_scope)
-    un_n = classify(new_supply, rules, overrides, prefer_scope, is_new_supply=True)
+    un_e = classify(existing, rules, overrides, prefer_scope, price_thresholds=price_thresholds)
+    un_n = classify(new_supply, rules, overrides, prefer_scope, is_new_supply=True,
+                    price_thresholds=price_thresholds)
+    if price_thresholds is not None:
+        ta, tb, tc = (t[1] for t in price_thresholds)
+        print(f"  単価帯判定ON（リゾート/温泉モード）: A≥{ta:,} / B≥{tb:,} / C≥{tc:,} / D<{tc:,}円")
     unresolved = un_e + un_n
     print(f"  未確定: 既存 {len(un_e)}件 / 新規 {len(un_n)}件")
     if args.list_unresolved:
