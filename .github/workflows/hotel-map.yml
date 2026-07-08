@@ -4,9 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       market:
-        description: "マーケット名（スライド見出しに使用）"
+        description: "マーケット名称（スライド見出し・ファイル名に使用。未指定ならdata/market.txtを使用）"
         required: false
-        default: "那覇市"
   push:
     paths:
       - "data/hotels.csv"
@@ -37,7 +36,10 @@ jobs:
         run: |
           MARKET="${{ github.event.inputs.market }}"
           if [ -z "$MARKET" ] && [ -f data/market.txt ]; then MARKET="$(head -n1 data/market.txt | tr -d '\r\n')"; fi
-          if [ -z "$MARKET" ]; then MARKET="那覇市"; fi
+          if [ -z "$MARKET" ]; then
+            echo "::error::マーケット名称が指定されていません。data/market.txt を置くか、workflow_dispatch実行時に market を指定してください。"
+            exit 1
+          fi
           echo "market = $MARKET"
           python hotel-map/build.py --csv data/hotels.csv --market "$MARKET"
 
@@ -57,7 +59,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: benchmark-hotels-pptx
-          path: |
-            output/benchmark_hotels.pptx
-            output/map.png
-            output/geocoded.csv
+          path: output/

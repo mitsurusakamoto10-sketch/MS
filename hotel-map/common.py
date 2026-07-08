@@ -72,6 +72,25 @@ def opening_year(value):
     return f"{m.group(1)}年" if m else (value or "-")
 
 
+def opening_sort_key(value):
+    """開業日文字列から (年, 月, 日) の昇順ソートキーを作る。値が無ければ最後尾に回す"""
+    nums = re.findall(r"\d+", value or "")
+    if not nums:
+        return (9999, 99, 99)
+    y = int(nums[0])
+    mo = int(nums[1]) if len(nums) > 1 else 1
+    d = int(nums[2]) if len(nums) > 2 else 1
+    return (y, mo, d)
+
+
+def sanitize_filename(name):
+    """ファイル名として使えない文字を除去・置換する"""
+    s = unicodedata.normalize("NFKC", name or "").strip()
+    s = re.sub(r'[\\/:*?"<>|]', "_", s)
+    s = re.sub(r"\s+", "", s)
+    return s or "マーケット未指定"
+
+
 # --- Webメルカトル（スリッピーマップ）座標変換 ---
 
 def lonlat_to_world(lon, lat):

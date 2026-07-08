@@ -13,8 +13,8 @@ from pathlib import Path
 
 import requests
 
-from common import (COL_ADDR, COL_NAME, DATA_DIR, normalize_address,
-                    read_csv_rows)
+from common import (COL_ADDR, COL_NAME, COL_OPEN, DATA_DIR, normalize_address,
+                    opening_sort_key, read_csv_rows)
 
 GSI_URL = "https://msearch.gsi.go.jp/address-search/AddressSearch?q={q}"
 USER_AGENT = "hotel-benchmark-map/0.1 (GitHub Actions; internal benchmark material)"
@@ -112,7 +112,8 @@ def write_geocoded(rows, out_path):
 
 def main(csv_path, out_path):
     rows = read_csv_rows(csv_path)
-    print(f"入力: {len(rows)}件")
+    rows.sort(key=lambda r: opening_sort_key(r.get(COL_OPEN)))
+    print(f"入力: {len(rows)}件（開業年の古い順にソート済み）")
     rows = geocode_all(rows)
     ok = sum(1 for r in rows if r.get("_lat"))
     print(f"ジオコーディング成功: {ok}/{len(rows)}件")
