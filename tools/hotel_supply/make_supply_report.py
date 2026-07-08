@@ -1090,6 +1090,20 @@ def main() -> int:
         else:
             seen[h.norm] = h
 
+    # 新規供給の重複（同名の再掲。計画段階の物件はIDが振り直されて二重掲載されやすい）。
+    # 2件目以降は集計から除外（室数0）し、二重計上を防ぐ。痕跡は判定根拠に残す。
+    seen_new: dict[str, Hotel] = {}
+    for h in new_supply:
+        prev = seen_new.get(h.norm)
+        if prev is not None:
+            h.needs_review = True
+            h.grade_reason = (h.grade_reason + "/" if h.grade_reason else "") + \
+                f"重複掲載のため集計除外(元{h.rooms}室)"
+            print(f"  ! 新規供給の重複を集計除外: {h.name} {h.rooms}室（{prev.name}と同一とみなす）")
+            h.rooms = 0
+        else:
+            seen_new[h.norm] = h
+
     out = args.output or f"{today.strftime('%Y%m%d')}_供給レポート_{args.city}.xlsx"
     print(f"[5/5] Excel生成: {out}")
     build_workbook(args.city, existing, new_supply, closed, asof_fy, out,
