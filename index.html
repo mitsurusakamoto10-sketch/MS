@@ -17,16 +17,6 @@
             <span class="clock-date" id="today-date"></span>
             <span class="clock-time" id="clock-time"></span>
           </div>
-          <nav class="quick-links" aria-label="AIサービス">
-            <a class="ai-link" href="https://chatgpt.com" target="_blank" rel="noopener" title="ChatGPT" aria-label="ChatGPTを開く">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="30" height="30" fill="#444444" aria-hidden="true">
-                <path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/>
-              </svg>
-            </a>
-            <a class="ai-link" href="https://claude.ai" target="_blank" rel="noopener" title="Claude" aria-label="Claudeを開く">
-              <img src="https://cdn.simpleicons.org/claude/D97757" alt="Claude" width="30" height="30" />
-            </a>
-          </nav>
         </div>
       </header>
 
@@ -57,6 +47,64 @@
         </section>
       </div>
 
+      <!-- 競合各社リリース（自社RSS優先 + PR TIMES補完・直近10日・最新順／毎朝8時更新 + 手動更新） -->
+      <section class="thumb-section" aria-label="競合リリース">
+        <div class="thumb-head">
+          <h2>競合リリース（直近10日・最新順）</h2>
+          <div class="thumb-head-right">
+            <a href="https://prtimes.jp/" target="_blank" rel="noopener">PR TIMESを開く ›</a>
+            <button type="button" class="refresh-btn" id="prtimes-refresh" title="今すぐ競合各社のリリースを取得する">
+              <span class="refresh-icon" aria-hidden="true">↻</span><span class="refresh-label">更新</span>
+            </button>
+          </div>
+        </div>
+        <p class="thumb-sub">対象：三井不動産・三菱地所・住友不動産・東京建物・野村不動産・東急不動産・森トラスト・ヒューリック・森ビル</p>
+        <div class="feed-list" id="prtimes-grid">
+          <div class="strip-loading">読み込み中…</div>
+        </div>
+      </section>
+
+      <!-- 各社のニュースリリースページへのリンク（競合リリースの直下） -->
+      <nav class="company-links" aria-label="不動産会社リリース">
+        <span class="company-links-label">リリース</span>
+        <a class="company-link" href="https://www.mitsuifudosan.co.jp/corporate/news/" target="_blank" rel="noopener" title="三井不動産 ニュースリリース">
+          <img src="https://www.google.com/s2/favicons?domain=mitsuifudosan.co.jp&sz=64" alt="" width="20" height="20" loading="lazy" />
+          <span>三井不動産</span>
+        </a>
+        <a class="company-link" href="https://www.mec.co.jp/news/" target="_blank" rel="noopener" title="三菱地所 ニュースリリース">
+          <img src="https://www.google.com/s2/favicons?domain=mec.co.jp&sz=64" alt="" width="20" height="20" loading="lazy" />
+          <span>三菱地所</span>
+        </a>
+        <a class="company-link" href="https://www.sumitomo-rd.co.jp/news/" target="_blank" rel="noopener" title="住友不動産 ニュースリリース">
+          <img src="https://www.google.com/s2/favicons?domain=sumitomo-rd.co.jp&sz=64" alt="" width="20" height="20" loading="lazy" />
+          <span>住友不動産</span>
+        </a>
+        <a class="company-link" href="https://tatemono.com/news/" target="_blank" rel="noopener" title="東京建物 ニュースリリース">
+          <img src="https://www.google.com/s2/favicons?domain=tatemono.com&sz=64" alt="" width="20" height="20" loading="lazy" />
+          <span>東京建物</span>
+        </a>
+        <a class="company-link" href="https://www.nomura-re-hd.co.jp/news/" target="_blank" rel="noopener" title="野村不動産 ニュースリリース">
+          <img src="https://www.google.com/s2/favicons?domain=nomura-re-hd.co.jp&sz=64" alt="" width="20" height="20" loading="lazy" />
+          <span>野村不動産</span>
+        </a>
+        <a class="company-link" href="https://www.tokyu-land.co.jp/news/" target="_blank" rel="noopener" title="東急不動産 ニュースリリース">
+          <img src="https://www.google.com/s2/favicons?domain=tokyu-land.co.jp&sz=64" alt="" width="20" height="20" loading="lazy" />
+          <span>東急不動産</span>
+        </a>
+        <a class="company-link" href="https://www.mori-trust.co.jp/news/" target="_blank" rel="noopener" title="森トラスト ニュースリリース（ホテルリゾート競合）">
+          <img src="https://www.google.com/s2/favicons?domain=mori-trust.co.jp&sz=64" alt="" width="20" height="20" loading="lazy" />
+          <span>森トラスト</span>
+        </a>
+        <a class="company-link" href="https://www.hulic.co.jp/news/" target="_blank" rel="noopener" title="ヒューリック ニュースリリース（ホテルリゾート競合）">
+          <img src="https://www.google.com/s2/favicons?domain=hulic.co.jp&sz=64" alt="" width="20" height="20" loading="lazy" />
+          <span>ヒューリック</span>
+        </a>
+        <a class="company-link" href="https://www.mori.co.jp/company/press/release/" target="_blank" rel="noopener" title="森ビル ニュースリリース（ホテルリゾート競合）">
+          <img src="https://www.google.com/s2/favicons?domain=mori.co.jp&sz=64" alt="" width="20" height="20" loading="lazy" />
+          <span>森ビル</span>
+        </a>
+      </nav>
+
       <!-- 日経不動産マーケット情報（公開ページのサムネイル） -->
       <section class="thumb-section" aria-label="日経不動産マーケット情報">
         <div class="thumb-head">
@@ -68,13 +116,34 @@
         </div>
       </section>
 
-      <!-- 業界リリース情報（AI調べ・Gemini + Web検索／毎朝8時更新） -->
+      <!-- 業界リリース情報（AI調べ・Gemini + Web検索／毎朝8時更新 + 手動更新） -->
       <section class="thumb-section" aria-label="業界リリース情報（AI調べ）">
         <div class="thumb-head">
           <h2>業界リリース情報（AI調べ）</h2>
-          <span class="thumb-note">毎朝8時更新・Gemini調べ</span>
+          <div class="thumb-head-right">
+            <span class="thumb-note">毎朝8時更新・Gemini調べ</span>
+            <button type="button" class="refresh-btn" id="release-refresh" title="今すぐAIで調べ直す">
+              <span class="refresh-icon" aria-hidden="true">↻</span><span class="refresh-label">更新</span>
+            </button>
+          </div>
         </div>
         <div class="feed-list" id="release-grid">
+          <div class="strip-loading">読み込み中…</div>
+        </div>
+      </section>
+
+      <!-- HotelBank 最新ニュース（RSS取得 + Geminiが重要度を判定／毎朝8時更新 + 手動更新） -->
+      <section class="thumb-section" aria-label="HotelBank 最新ニュース">
+        <div class="thumb-head">
+          <h2>🏨 HotelBank 最新ニュース（開業・供給・投資・開発）</h2>
+          <div class="thumb-head-right">
+            <a href="https://hotelbank.jp/newlist/" target="_blank" rel="noopener">HotelBankを開く ›</a>
+            <button type="button" class="refresh-btn" id="hotelbank-refresh" title="今すぐ最新ニュースを取得する">
+              <span class="refresh-icon" aria-hidden="true">↻</span><span class="refresh-label">更新</span>
+            </button>
+          </div>
+        </div>
+        <div class="feed-list" id="hotelbank-grid">
           <div class="strip-loading">読み込み中…</div>
         </div>
       </section>
@@ -90,13 +159,20 @@
         </div>
       </section>
 
-      <!-- カードを並べるエリア。中身は script.js が組み立てます -->
-      <section class="grid">
-        <!-- 上場REIT 開示情報（EDINET・直近10日） -->
-        <article class="card">
-          <div class="card-header"><span class="icon">🏢</span><h2>上場REIT 開示情報（EDINET・直近10日）</h2></div>
-          <div class="card-body" id="disclosure-card"></div>
-        </article>
+      <!-- 上場REIT 物件取引開示（適時開示TDnet・直近1か月／他フィードと同じ全幅・1行表示） -->
+      <section class="thumb-section" aria-label="上場REIT 物件取引開示（TDnet）">
+        <div class="thumb-head">
+          <h2>上場REIT 物件取引開示（取得・売却・賃貸借／適時開示TDnet・直近1か月）</h2>
+          <div class="thumb-head-right">
+            <a href="https://www.release.tdnet.info/" target="_blank" rel="noopener">TDnetを開く ›</a>
+            <button type="button" class="refresh-btn" id="reit-refresh" title="今すぐTDnetを再取得する">
+              <span class="refresh-icon" aria-hidden="true">↻</span><span class="refresh-label">更新</span>
+            </button>
+          </div>
+        </div>
+        <div class="feed-list" id="disclosure-card">
+          <div class="strip-loading">読み込み中…</div>
+        </div>
       </section>
 
       <footer class="page-footer">

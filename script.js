@@ -352,11 +352,13 @@ function feedRow(it) {
 }
 
 // 業界リリース情報（AI調べ：Gemini + Web検索／毎朝8時更新）
-async function loadRelease() {
+async function loadRelease(force) {
   const el = document.getElementById("release-grid");
   if (!el) return;
   try {
-    const res = await fetch("/api/release", { cache: "no-store" });
+    // force=true のときはキャッシュを避け、その時点でAIに調べ直させる
+    const url = force ? "/api/release?fresh=1&t=" + Date.now() : "/api/release";
+    const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) throw new Error("status " + res.status);
     const data = await res.json();
     if (data.error === "no_api_key") {
@@ -366,7 +368,7 @@ async function loadRelease() {
     }
     if (!data.items || data.items.length === 0) {
       el.innerHTML =
-        '<div class="strip-loading">直近24時間の該当ニュースは見つかりませんでした（次回更新で再取得します）。</div>';
+        '<div class="strip-loading">直近3日間の該当ニュースは見つかりませんでした（次回更新で再取得します）。</div>';
       return;
     }
     el.innerHTML = data.items.map(releaseRow).join("");
@@ -376,18 +378,81 @@ async function loadRelease() {
   }
 }
 
-// 1行＝1ニュース（見出しリンク + 要点）
+// 1行＝1ニュース（見出しリンク + 公開日 + 要点）
 function releaseRow(it) {
   return (
     '<a class="release-row" href="' +
     escAttr(it.link) +
     '" target="_blank" rel="noopener">' +
     '<span class="release-title">' +
+    (it.date ? '<span class="release-date">' + esc(it.date) + "</span>" : "") +
     esc(it.title) +
     "</span>" +
     (it.summary
       ? '<span class="release-summary">' + esc(it.summary) + "</span>"
       : "") +
+    "</a>"
+  );
+}
+
+// HotelBank 最新ニュース（RSS + Geminiが重要度判定／名称 + 公開日）
+async function loadHotelBank(force) {
+  const el = document.getElementById("hotelbank-grid");
+  if (!el) return;
+  try {
+    const url = force ? "/api/hotelbank?fresh=1&t=" + Date.now() : "/api/hotelbank";
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error("status " + res.status);
+    const data = await res.json();
+    if (!data.items || data.items.length === 0) {
+      el.innerHTML =
+        '<div class="strip-loading">最新ニュースを取得できませんでした（あとで再取得します）。</div>';
+      return;
+    }
+    // 名称（タイトル）＋公開日バッジ。要点は無いので releaseRow を流用
+    el.innerHTML = data.items.map(releaseRow).join("");
+  } catch (e) {
+    el.innerHTML =
+      '<div class="strip-loading">最新ニュースを取得できませんでした（あとで再取得します）。</div>';
+  }
+}
+
+// 競合各社リリース（PR TIMES・直近10日・最新順／会社名 + 日付 + リリース名）
+async function loadPRTimes(force) {
+  const el = document.getElementById("prtimes-grid");
+  if (!el) return;
+  try {
+    const url = force ? "/api/competitors?fresh=1&t=" + Date.now() : "/api/competitors";
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error("status " + res.status);
+    const data = await res.json();
+    if (!data.items || data.items.length === 0) {
+      el.innerHTML =
+        '<div class="strip-loading">直近' +
+        (data.days || 10) +
+        "日に競合各社のリリースはありませんでした。</div>";
+      return;
+    }
+    el.innerHTML = data.items.map(prtimesRow).join("");
+  } catch (e) {
+    el.innerHTML =
+      '<div class="strip-loading">競合リリースを取得できませんでした（あとで再取得します）。</div>';
+  }
+}
+
+// 1行＝1リリース（日付バッジ + 会社名バッジ + リリース名）
+function prtimesRow(it) {
+  return (
+    '<a class="release-row" href="' +
+    escAttr(it.link) +
+    '" target="_blank" rel="noopener">' +
+    '<span class="release-title">' +
+    (it.date ? '<span class="release-date">' + esc(it.date) + "</span>" : "") +
+    '<span class="prt-company">' +
+    esc(it.company) +
+    "</span>" +
+    esc(it.title) +
+    "</span>" +
     "</a>"
   );
 }
@@ -405,12 +470,14 @@ function escAttr(str) {
   return esc(str).replace(/"/g, "&quot;");
 }
 
-// 上場REIT開示（EDINET・直近10日・題名のみ）
-async function loadREIT() {
+// 上場REIT開示（EDINET・直近1か月・題名のみ）
+async function loadREIT(force) {
   const el = document.getElementById("disclosure-card");
   if (!el) return;
   try {
-    const res = await fetch("/api/reit", { cache: "no-store" });
+    // force=true のときはキャッシュを避け、その時点でTDnet(適時開示)を再取得する
+    const url = force ? "/api/tdnet?fresh=1&t=" + Date.now() : "/api/tdnet";
+    const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) throw new Error("status " + res.status);
     const data = await res.json();
     if (data.error === "no_api_key") {
@@ -420,11 +487,11 @@ async function loadREIT() {
     }
     if (!data.items || data.items.length === 0) {
       el.innerHTML =
-        '<div class="strip-loading">直近10日の開示はありませんでした。</div>';
+        '<div class="strip-loading">直近1か月に、物件の取得・売却・賃貸借に関する開示はありませんでした。</div>';
       return;
     }
-    el.innerHTML =
-      '<div class="feed-list">' + data.items.map(reitRow).join("") + "</div>";
+    // #disclosure-card 自体が feed-list なので行を直接入れる（二重枠を回避）
+    el.innerHTML = data.items.map(reitRow).join("");
   } catch (e) {
     el.innerHTML =
       '<div class="strip-loading">開示情報を取得できませんでした（あとで再取得します）。</div>';
@@ -555,14 +622,60 @@ document.addEventListener("DOMContentLoaded", () => {
     loadThumbs("newspicks", "picks-grid");
   }, 30 * 60 * 1000);
 
-  // 上場REIT開示(EDINET)：初回取得 + 毎朝8時に更新
+  // 上場REIT開示(EDINET)：初回取得 + 毎朝8時に更新 + 手動更新ボタン
   loadREIT();
   scheduleDailyAt8(loadREIT);
+  setupRefreshButton("reit-refresh", "disclosure-card", loadREIT, "EDINETを再取得中…");
 
-  // 業界リリース情報（AI調べ）：初回取得 + 毎朝8時に更新
+  // 業界リリース情報（AI調べ）：初回取得 + 毎朝8時に更新 + 手動更新ボタン
   loadRelease();
   scheduleDailyAt8(loadRelease);
+  setupRefreshButton(
+    "release-refresh",
+    "release-grid",
+    loadRelease,
+    "AIが調査中…（最大30秒ほどかかります）"
+  );
+
+  // HotelBank 最新ニュース：初回取得 + 毎朝8時に更新 + 手動更新ボタン
+  loadHotelBank();
+  scheduleDailyAt8(loadHotelBank);
+  setupRefreshButton(
+    "hotelbank-refresh",
+    "hotelbank-grid",
+    loadHotelBank,
+    "最新ニュースを取得中…"
+  );
+
+  // 競合リリース（PR TIMES）：初回取得 + 毎朝8時に更新 + 手動更新ボタン
+  loadPRTimes();
+  scheduleDailyAt8(loadPRTimes);
+  setupRefreshButton(
+    "prtimes-refresh",
+    "prtimes-grid",
+    loadPRTimes,
+    "競合リリースを取得中…"
+  );
 });
+
+// 「更新」ボタン：押すとその時点で loadFn(true) を実行して再取得する
+function setupRefreshButton(btnId, targetId, loadFn, loadingText) {
+  const btn = document.getElementById(btnId);
+  const el = document.getElementById(targetId);
+  if (!btn || !el) return;
+  btn.addEventListener("click", async () => {
+    if (btn.disabled) return;
+    btn.disabled = true;
+    btn.classList.add("is-loading");
+    el.innerHTML = '<div class="strip-loading">' + loadingText + "</div>";
+    try {
+      await loadFn(true);
+    } finally {
+      btn.disabled = false;
+      btn.classList.remove("is-loading");
+    }
+  });
+}
 
 // 毎朝8時(ローカル時刻)に関数を実行する
 function scheduleDailyAt8(fn) {
