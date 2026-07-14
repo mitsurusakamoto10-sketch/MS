@@ -240,28 +240,85 @@ def load_existing(path: str) -> list[Hotel]:
     return hotels
 
 
+_CATEGORY_KEYWORDS = ("ホテル", "旅館", "ゲストハウス", "ホステル", "貸別荘", "民宿",
+                      "カプセル", "ペンション", "旅籠", "コテージ", "ロッジ", "宿",
+                      "B&B", "ヴィラ", "別荘")
+
+
+def _looks_like_date(v: str) -> bool:
+    s = (v or "").strip()
+    return bool(re.match(r"\d{4}[/-]\d{1,2}([/-]\d{1,2})?", s) or re.fullmatch(r"\d{4}年?", s))
+
+
+def _looks_like_category(v: str) -> bool:
+    s = (v or "").strip()
+    if not s or re.fullmatch(r"[\d.,]+", s):
+        return False
+    return any(k in s for k in _CATEGORY_KEYWORDS)
+
+
 def load_closed(path: str) -> list[Hotel]:
-    """閉業施設CSV: 閉業施設名,住所,部屋数,閉業日,カテゴリー"""
-    rows = read_csv_rows(path)
-    if not rows:
+    """閉業施設CSV: 閉業施設名,住所,部屋数,閉業日,カテゴリー
+
+    メトロエンジンの書き出しによっては、ヘッダーに無い列（スコア・レビュー数）が
+    データ側に挿入され、閉業日・カテゴリー列が右にずれることがある。ヘッダー名だけに
+    頼らず、各列の中身から日付列・カテゴリー列を推定して吸収する。
+    """
+    with open(path, newline="", encoding="utf-8-sig") as f:
+        raw = [row for row in csv.reader(f) if any((c or "").strip() for c in row)]
+    if not raw:
         return []
-    cols = list(rows[0].keys())
-    c_name = find_col(cols, "閉業施設名", "施設名", "ホテル名")
-    c_addr = find_col(cols, "住所")
-    c_rooms = find_col(cols, "部屋数")
-    c_close = find_col(cols, "閉業日")
-    c_cat = find_col(cols, "カテゴリー")
+    header = [(c or "").strip() for c in raw[0]]
+    body = raw[1:]
+    ncol = max((len(r) for r in body), default=len(header))
+
+    def cell(r: list[str], i: int) -> str:
+        return (r[i].strip() if i < len(r) and r[i] is not None else "")
+
+    def header_idx(*cands: str) -> int | None:
+        for cand in cands:
+            for i, h in enumerate(header):
+                if cand in h:
+                    return i
+        return None
+
+    def detect_idx(predicate) -> int | None:
+        """本文の各列で predicate に合致する割合が最も高い列を返す。"""
+        best, best_score = None, 0
+        for i in range(ncol):
+            vals = [cell(r, i) for r in body]
+            nonempty = [v for v in vals if v]
+            if not nonempty:
+                continue
+            score = sum(1 for v in nonempty if predicate(v)) / len(nonempty)
+            if score > best_score and score >= 0.5:
+                best, best_score = i, score
+        return best
+
+    i_name = header_idx("閉業施設名", "施設名", "ホテル名") or 0
+    i_addr = header_idx("住所")
+    i_rooms = header_idx("部屋数")
+    # 閉業日・カテゴリーはヘッダー位置の中身が実データと合っているか確認し、
+    # ずれている場合は中身から推定した列に切り替える。
+    i_close = header_idx("閉業日")
+    if i_close is None or not any(_looks_like_date(cell(r, i_close)) for r in body):
+        i_close = detect_idx(_looks_like_date)
+    i_cat = header_idx("カテゴリー")
+    if i_cat is None or not any(_looks_like_category(cell(r, i_cat)) for r in body):
+        i_cat = detect_idx(_looks_like_category)
+
     hotels = []
-    for r in rows:
-        h = Hotel(
-            name=(r.get(c_name) or "").strip(),
-            address=(r.get(c_addr) or "").strip() if c_addr else "",
-            category=(r.get(c_cat) or "").strip() if c_cat else "",
-            rooms=parse_rooms(r.get(c_rooms)) if c_rooms else None,
-            close_date=parse_date(r.get(c_close)) if c_close else None,
-        )
-        if not h.name:
+    for r in body:
+        name = cell(r, i_name)
+        if not name:
             continue
+        h = Hotel(
+            name=name,
+            address=cell(r, i_addr) if i_addr is not None else "",
+            category=cell(r, i_cat) if i_cat is not None else "",
+            rooms=parse_rooms(cell(r, i_rooms)) if i_rooms is not None else None,
+            close_date=parse_date(cell(r, i_close)) if i_close is not None else None,
+        )
         h.close_fy = fiscal_year(h.close_date) if h.close_date else NO_CLOSE_FY
         hotels.append(h)
     return hotels
