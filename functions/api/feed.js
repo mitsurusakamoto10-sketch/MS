@@ -161,6 +161,35 @@ function parse(html, conf) {
   return items;
 }
 
+// 埋め込みJSON(JS描画用データ)から記事を抽出する
+// 「\/news\/12345」(JSONエスケープ) や「"newsId":12345」の近傍にある "title":"..." を拾う
+function parseEmbedded(html, conf) {
+  const items = [];
+  const seen = new Set();
+  const patterns = [/\\\/news\\\/(\d{4,})/g, /"news_?[iI]d"\s*:\s*"?(\d{4,})"?/g];
+  for (const re of patterns) {
+    let m;
+    while ((m = re.exec(html)) !== null && items.length < conf.limit) {
+      const id = m[1];
+      if (seen.has(id)) continue;
+      const ctx = html.slice(Math.max(0, m.index - 700), m.index + 700);
+      const tm = ctx.match(/"title"\s*:\s*"((?:[^"\\]|\\.){8,150})"/);
+      if (!tm) continue;
+      let title = tm[1];
+      try {
+        title = JSON.parse('"' + title + '"'); // \uXXXX 等をデコード
+      } catch (e) {}
+      title = clean(title);
+      if (!title || title.length < 8 || looksLikeJunk(title)) continue;
+      if (conf.titleBlacklist && conf.titleBlacklist.some((b) => title.indexOf(b) >= 0)) continue;
+      seen.add(id);
+      items.push({ title, link: conf.base + "/news/" + id });
+    }
+    if (items.length >= conf.limit) break;
+  }
+  return items;
+}
+
 // 抽出結果が少ない場合にフォールバックRSSから補完する
 async function withFallback(items, conf, debug) {
   if (!conf.fallbackRss || items.length >= 3) return items;
@@ -230,11 +259,59 @@ export async function onRequest(context) {
       });
     }
 
+    // 構造調査用: HTML内のパターン出現数とサンプル文脈を返す
+    if (reqUrl.searchParams.get("scan") === "1") {
+      const count = (re) => (html.match(re) || []).length;
+      const ctxOf = (re, n) => {
+        const out = [];
+        let m2;
+        const g = new RegExp(re.source, "g");
+        while ((m2 = g.exec(html)) !== null && out.length < n) {
+          out.push(html.slice(Math.max(0, m2.index - 150), m2.index + 250).replace(/\s+/g, " "));
+        }
+        return out;
+      };
+      return new Response(
+        JSON.stringify(
+          {
+            htmlLength: html.length,
+            counts: {
+              anchor_news: count(/<a[^>]+href=["'][^"']*\/news\/\d+/gi),
+              escaped_news: count(/\\\/news\\\/\d+/g),
+              newsId: count(/"news_?[iI]d"\s*:/g),
+              title_json: count(/"title"\s*:\s*"/g),
+              next_data: count(/__NEXT_DATA__/g),
+              nuxt: count(/__NUXT__/g),
+            },
+            samples: {
+              escaped_news: ctxOf(/\\\/news\\\/\d+/, 2),
+              newsId: ctxOf(/"news_?[iI]d"\s*:/, 2),
+              title_json: ctxOf(/"title"\s*:\s*"/, 3),
+            },
+          },
+          null,
+          2
+        ),
+        { headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" } }
+      );
+    }
+
     let items = parse(html, conf);
     debug.count = items.length;
     debug.source = "html";
 
-    // 記事一覧がJS描画等でほぼ拾えない場合はフォールバックRSSへ
+    // 静的アンカーで拾えない場合は埋め込みJSONから抽出
+    if (items.length < 3) {
+      const em = parseEmbedded(html, conf);
+      debug.embeddedCount = em.length;
+      if (em.length > items.length) {
+        items = em;
+        debug.source = "embedded_json";
+        debug.count = em.length;
+      }
+    }
+
+    // それでも拾えない場合はフォールバックRSSへ
     items = await withFallback(items, conf, debug);
 
     const body = { updatedAt: new Date().toISOString(), items };
