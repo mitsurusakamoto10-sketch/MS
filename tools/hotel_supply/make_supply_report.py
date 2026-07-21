@@ -384,7 +384,7 @@ def load_overrides(path: str | None) -> dict[str, str]:
         for r in csv.DictReader(f):
             n = (r.get("施設名") or "").strip()
             g = (r.get("グレード") or "").strip()
-            if n and g in ("A", "B", "C", "D", "不明・その他"):
+            if n and g in ("A", "B", "C", "D", "不明・その他", "除外"):
                 out[normalize(n)] = g
     return out
 
@@ -438,6 +438,13 @@ def classify(
     for h in hotels:
         # (1) オーバーライド
         g = overrides.get(h.norm)
+        if g == "除外":
+            # 対象マーケット外・重複掲載など、集計から意図的に外す指定。
+            # 行は残し部屋数を0にする（元の室数は判定根拠に記録）。
+            h.grade = "不明・その他"
+            h.grade_reason = f"オーバーライド表により集計除外(元{h.rooms if h.rooms is not None else '不明'}室)"
+            h.rooms = 0
+            continue
         if g:
             h.grade, h.grade_reason = g, "オーバーライド表"
             continue
@@ -1134,16 +1141,26 @@ def main() -> int:
         target = c.extra.get("target")
         c.grade = target.grade if target is not None else overrides.get(c.norm, "")
 
-    # 同名重複の検出（メトロエンジンのデータに稀に重複掲載があるため、二重計上の疑いを警告）
+    # 同名重複の検出（メトロエンジンのデータに稀に重複掲載があるため、二重計上の疑いを警告）。
+    # 室数まで同じなら同一施設の再掲とみなし、開業年度が後の行を集計から除外（室数0）する。
+    # 先行行（閉業なし）が全年度をカバーするため、後発行を0にすれば各年度の集計は正しくなる。
     seen: dict[str, Hotel] = {}
     for h in existing:
         prev = seen.get(h.norm)
         if prev is not None:
-            for x in (prev, h):
-                x.needs_review = True
-                if "同名重複疑い" not in x.grade_reason:
-                    x.grade_reason = (x.grade_reason + "/" if x.grade_reason else "") + "同名重複疑い"
-            print(f"  ! 同名重複疑い（二重計上の可能性）: {h.name} {h.rooms}室")
+            if prev.rooms == h.rooms and h.rooms:
+                drop = h if h.open_fy >= prev.open_fy else prev
+                drop.needs_review = True
+                drop.grade_reason = (drop.grade_reason + "/" if drop.grade_reason else "") + \
+                    f"同名・同室数の重複掲載のため集計除外(元{drop.rooms}室)"
+                print(f"  ! 既存の重複を集計除外: {drop.name} {drop.rooms}室（同名・同室数の再掲）")
+                drop.rooms = 0
+            else:
+                for x in (prev, h):
+                    x.needs_review = True
+                    if "同名重複疑い" not in x.grade_reason:
+                        x.grade_reason = (x.grade_reason + "/" if x.grade_reason else "") + "同名重複疑い"
+                print(f"  ! 同名重複疑い（二重計上の可能性）: {h.name} {h.rooms}室")
         else:
             seen[h.norm] = h
 
