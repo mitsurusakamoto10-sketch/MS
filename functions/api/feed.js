@@ -39,6 +39,20 @@ const SOURCES = {
     linkRe: /\/news\/\d+/i,
     limit: 5,
     preferAlt: false,
+    // フッター等の規約系リンク（/news/数字 形式だが記事ではない）を除外
+    titleBlacklist: [
+      "コミュニティ・スタンダード",
+      "利用規約",
+      "プライバシー",
+      "個人情報",
+      "運営会社",
+      "ヘルプ",
+      "広告掲載",
+      "特定商取引",
+    ],
+    // 記事がJS描画で拾えない場合のフォールバック（Bing Newsでnewspicks.com内を検索）
+    fallbackRss:
+      "https://www.bing.com/news/search?q=site%3Anewspicks.com&format=rss&setlang=ja-JP&cc=JP",
   },
 };
 
@@ -58,6 +72,23 @@ function clean(s) {
 // CSSやスクリプトの混入を弾く
 function looksLikeJunk(s) {
   return /[{}]|display\s*:|css-[a-z0-9]|@media|webkit/i.test(s);
+}
+
+// フォールバック用の簡易RSSパーサ（<item>の<title>/<link>を抽出）
+function parseRss(xml, limit) {
+  const items = [];
+  const blocks = xml.match(/<item\b[\s\S]*?<\/item>/gi) || [];
+  for (const b of blocks) {
+    const tm = b.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+    const lm = b.match(/<link[^>]*>([\s\S]*?)<\/link>/i);
+    if (!tm || !lm) continue;
+    const title = clean(tm[1].replace(/<!\[CDATA\[|\]\]>/g, ""));
+    const link = clean(lm[1].replace(/<!\[CDATA\[|\]\]>/g, ""));
+    if (!title || title.length < 6 || !/^https?:\/\//i.test(link)) continue;
+    items.push({ title, link });
+    if (items.length >= limit) break;
+  }
+  return items;
 }
 
 function parse(html, conf) {
@@ -109,6 +140,8 @@ function parse(html, conf) {
     }
     if (!title) title = clean(m[2]);
     if (!title || looksLikeJunk(title)) continue;
+    // 規約系リンク等の除外
+    if (conf.titleBlacklist && conf.titleBlacklist.some((b) => title.indexOf(b) >= 0)) continue;
 
     // 先頭のカテゴリ表記を除去
     if (conf.stripCats) {
@@ -171,8 +204,32 @@ export async function onRequest(context) {
       });
     }
 
-    const items = parse(html, conf);
+    let items = parse(html, conf);
     debug.count = items.length;
+    debug.source = "html";
+
+    // 記事一覧がJS描画等でほぼ拾えない場合はフォールバックRSSへ
+    if (conf.fallbackRss && items.length < 3) {
+      try {
+        const fres = await fetch(conf.fallbackRss, {
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+            Accept: "application/rss+xml, application/xml, */*;q=0.8",
+          },
+        });
+        if (fres.ok) {
+          const fitems = parseRss(await fres.text(), conf.limit);
+          if (fitems.length > items.length) {
+            items = fitems;
+            debug.source = "fallback_rss";
+            debug.count = items.length;
+          }
+        }
+      } catch (e2) {
+        debug.fallbackError = String(e2).slice(0, 120);
+      }
+    }
 
     const body = { updatedAt: new Date().toISOString(), items };
     if (debugOn) body.debug = debug;
