@@ -161,6 +161,32 @@ function parse(html, conf) {
   return items;
 }
 
+// 抽出結果が少ない場合にフォールバックRSSから補完する
+async function withFallback(items, conf, debug) {
+  if (!conf.fallbackRss || items.length >= 3) return items;
+  try {
+    const fres = await fetch(conf.fallbackRss, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+        Accept: "application/rss+xml, application/xml, */*;q=0.8",
+      },
+    });
+    debug.fallbackStatus = fres.status;
+    if (fres.ok) {
+      const fitems = parseRss(await fres.text(), conf.limit);
+      if (fitems.length > items.length) {
+        debug.source = "fallback_rss";
+        debug.count = fitems.length;
+        return fitems;
+      }
+    }
+  } catch (e) {
+    debug.fallbackError = String(e).slice(0, 120);
+  }
+  return items;
+}
+
 export async function onRequest(context) {
   const reqUrl = new URL(context.request.url);
   const src = reqUrl.searchParams.get("src");
@@ -209,27 +235,7 @@ export async function onRequest(context) {
     debug.source = "html";
 
     // 記事一覧がJS描画等でほぼ拾えない場合はフォールバックRSSへ
-    if (conf.fallbackRss && items.length < 3) {
-      try {
-        const fres = await fetch(conf.fallbackRss, {
-          headers: {
-            "User-Agent":
-              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
-            Accept: "application/rss+xml, application/xml, */*;q=0.8",
-          },
-        });
-        if (fres.ok) {
-          const fitems = parseRss(await fres.text(), conf.limit);
-          if (fitems.length > items.length) {
-            items = fitems;
-            debug.source = "fallback_rss";
-            debug.count = items.length;
-          }
-        }
-      } catch (e2) {
-        debug.fallbackError = String(e2).slice(0, 120);
-      }
-    }
+    items = await withFallback(items, conf, debug);
 
     const body = { updatedAt: new Date().toISOString(), items };
     if (debugOn) body.debug = debug;
@@ -237,17 +243,25 @@ export async function onRequest(context) {
     return new Response(JSON.stringify(body), {
       headers: {
         "Content-Type": "application/json; charset=utf-8",
-        "Cache-Control": "public, max-age=900",
+        // 空のときはキャッシュしない（次のアクセスで再試行）
+        "Cache-Control": items.length > 0 ? "public, max-age=900" : "no-store",
         "Access-Control-Allow-Origin": "*",
       },
     });
   } catch (e) {
-    const body = { updatedAt: new Date().toISOString(), items: [], error: String(e) };
+    // 本体ページの取得自体が失敗(403等)してもフォールバックRSSを試す
+    let items = [];
+    try {
+      items = await withFallback([], conf, debug);
+    } catch (e2) {}
+    const body = { updatedAt: new Date().toISOString(), items };
+    if (items.length === 0) body.error = String(e);
     if (debugOn) body.debug = debug;
     return new Response(JSON.stringify(body), {
       status: 200,
       headers: {
         "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": items.length > 0 ? "public, max-age=900" : "no-store",
         "Access-Control-Allow-Origin": "*",
       },
     });
