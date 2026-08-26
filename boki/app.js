@@ -48,17 +48,66 @@
     return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
   }
 
+  /* 数字を3桁区切りにする（小数部はそのまま） */
+  function groupDigits(intDigits) {
+    return intDigits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  }
+
+  /* 金額入力欄の値を「1,234,567」形式に整形する（カーソル位置を維持） */
+  function formatAmountInput(el) {
+    var raw = el.value;
+    if (raw === "") return;
+    var caret = el.selectionStart;
+    var digitsBefore = raw.slice(0, caret == null ? raw.length : caret).replace(/[^0-9０-９]/g, "").length;
+
+    var s = raw.replace(/[０-９]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); });
+    var neg = /^\s*[-−△▲]/.test(s);
+    var dot = s.indexOf(".") >= 0 || s.indexOf("．") >= 0;
+    var parts = s.replace(/．/g, ".").replace(/[^0-9.]/g, "").split(".");
+    var intPart = parts[0].replace(/^0+(?=\d)/, "");
+    var decPart = parts.length > 1 ? parts.slice(1).join("").slice(0, 4) : "";
+
+    var out = "";
+    if (intPart !== "" || decPart !== "" || dot) {
+      out = (neg ? "-" : "") + groupDigits(intPart === "" ? "0" : intPart) + (dot ? "." + decPart : "");
+    } else if (neg) {
+      out = "-"; /* マイナス記号だけ入力した直後 */
+    }
+    if (out === el.value) return;
+    el.value = out;
+
+    /* 整形後の文字列で、カーソル前にあった桁数ぶん進んだ位置にキャレットを戻す */
+    var pos = out.length;
+    if (digitsBefore <= 0) {
+      pos = neg ? 1 : 0;
+    } else {
+      var count = 0;
+      for (var i = 0; i < out.length; i++) {
+        if (/\d/.test(out[i])) {
+          count++;
+          if (count === digitsBefore) { pos = i + 1; break; }
+        }
+      }
+    }
+    try { el.setSelectionRange(pos, pos); } catch (e) { /* ignore */ }
+  }
+
+  function isAmountInput(el) {
+    return el && el.tagName === "INPUT" &&
+      (el.classList.contains("amount") || el.classList.contains("cell-input"));
+  }
+
   /* 金額パース: カンマ・全角数字・¥・円・空白を許容。負数は - / △ */
   function parseAmount(raw) {
     if (raw == null) return NaN;
     var s = String(raw).trim();
     if (s === "") return NaN;
     s = s.replace(/[０-９]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); });
-    s = s.replace(/[，,¥￥円\s]/g, "");
+    s = s.replace(/[，,¥￥円\s]/g, "").replace(/．/g, ".");
     var neg = false;
     if (/^[-−△▲]/.test(s)) { neg = true; s = s.slice(1); }
-    if (!/^\d+$/.test(s)) return NaN;
-    var v = parseInt(s, 10);
+    if (!/^\d+(\.\d+)?$/.test(s)) return NaN;
+    var v = parseFloat(s);
     return neg ? -v : v;
   }
 
@@ -807,6 +856,7 @@
     var el = e.target;
     var store = currentAnswers();
     if (!store) return;
+    if (isAmountInput(el)) formatAmountInput(el);
     if (el.hasAttribute("data-j")) {
       var qid = el.getAttribute("data-j");
       var side = el.getAttribute("data-side");
@@ -842,6 +892,188 @@
   document.addEventListener("visibilitychange", function () {
     if (document.visibilityState === "hidden" && state.exam) saveExamSnapshot();
   });
+
+  /* ---------------- 電卓 ---------------- */
+  var calcEl = document.getElementById("calc");
+  var calcMain = document.getElementById("calc-main");
+  var calcSub = document.getElementById("calc-sub");
+  var calc = { cur: "0", acc: null, op: null, fresh: true, mem: 0 };
+  var lastAmountInput = null;
+
+  /* 金額入力欄にフォーカスが入るたび、貼り付け先として覚えておく */
+  document.addEventListener("focusin", function (e) {
+    if (isAmountInput(e.target)) lastAmountInput = e.target;
+  });
+
+  function calcFmt(numStr) {
+    var s = String(numStr);
+    if (s === "" || s === "-" || s === "エラー") return s || "0";
+    var neg = s.charAt(0) === "-";
+    if (neg) s = s.slice(1);
+    var p = s.split(".");
+    return (neg ? "-" : "") + groupDigits(p[0]) + (p.length > 1 ? "." + p[1] : "");
+  }
+  function calcRender() {
+    calcMain.textContent = calcFmt(calc.cur);
+    var sub = "";
+    if (calc.acc !== null && calc.op) {
+      sub = calcFmt(String(calc.acc)) + " " + ({ "+": "＋", "-": "−", "*": "×", "/": "÷" }[calc.op] || calc.op);
+    }
+    if (calc.mem !== 0) sub = (sub ? sub + "　" : "") + "M";
+    calcSub.textContent = sub;
+  }
+  function calcRound(n) {
+    if (!isFinite(n)) return NaN;
+    return Math.round(n * 1e8) / 1e8;
+  }
+  function calcApply(a, op, b) {
+    if (op === "+") return a + b;
+    if (op === "-") return a - b;
+    if (op === "*") return a * b;
+    if (op === "/") return b === 0 ? NaN : a / b;
+    return b;
+  }
+  function calcNum() {
+    var v = parseFloat(calc.cur);
+    return isNaN(v) ? 0 : v;
+  }
+  function calcSetResult(v) {
+    calc.cur = isNaN(v) ? "エラー" : String(calcRound(v));
+    calc.fresh = true;
+  }
+  function calcKey(k) {
+    if (calc.cur === "エラー" && k !== "AC" && k !== "C") { calc.cur = "0"; calc.fresh = true; }
+    if (/^\d$/.test(k) || k === "00") {
+      if (calc.fresh) { calc.cur = k === "00" ? "0" : k; calc.fresh = false; }
+      else if (calc.cur === "0") { calc.cur = k === "00" ? "0" : k; }
+      else if (calc.cur.replace(/[^0-9]/g, "").length < 14) { calc.cur += k; }
+    } else if (k === ".") {
+      if (calc.fresh) { calc.cur = "0."; calc.fresh = false; }
+      else if (calc.cur.indexOf(".") < 0) calc.cur += ".";
+    } else if (k === "+" || k === "-" || k === "*" || k === "/") {
+      if (calc.acc !== null && calc.op && !calc.fresh) {
+        calcSetResult(calcApply(calc.acc, calc.op, calcNum()));
+      }
+      calc.acc = calcNum();
+      calc.op = k;
+      calc.fresh = true;
+    } else if (k === "=") {
+      if (calc.acc !== null && calc.op) {
+        calcSetResult(calcApply(calc.acc, calc.op, calcNum()));
+        calc.acc = null;
+        calc.op = null;
+      }
+    } else if (k === "AC") {
+      calc.cur = "0"; calc.acc = null; calc.op = null; calc.fresh = true;
+    } else if (k === "C") {
+      calc.cur = "0"; calc.fresh = true;
+    } else if (k === "BS") {
+      if (!calc.fresh && calc.cur.length > 1) calc.cur = calc.cur.slice(0, -1);
+      else { calc.cur = "0"; calc.fresh = true; }
+    } else if (k === "M+") {
+      calc.mem = calcRound(calc.mem + calcNum()); calc.fresh = true;
+    } else if (k === "M-") {
+      calc.mem = calcRound(calc.mem - calcNum()); calc.fresh = true;
+    } else if (k === "MR") {
+      calc.cur = String(calc.mem); calc.fresh = true;
+    } else if (k === "MC") {
+      calc.mem = 0;
+    }
+    calcRender();
+  }
+
+  function calcOpen(open) {
+    calcEl.classList.toggle("hidden", !open);
+    if (open) {
+      calcEl.focus();
+      calcRender();
+    }
+    var st = lsGet("boki_v1_calc", {});
+    st.open = open;
+    lsSet("boki_v1_calc", st);
+  }
+  function calcIsOpen() { return !calcEl.classList.contains("hidden"); }
+
+  calcEl.addEventListener("click", function (e) {
+    var b = e.target.closest ? e.target.closest("[data-k]") : null;
+    if (b) { calcKey(b.getAttribute("data-k")); calcEl.focus(); }
+  });
+  document.getElementById("calc-close").onclick = function () { calcOpen(false); };
+  document.getElementById("calc-toggle").onclick = function () { calcOpen(!calcIsOpen()); };
+  document.getElementById("calc-paste").onclick = function () {
+    var target = lastAmountInput;
+    if (!target || !document.body.contains(target)) {
+      alert("先に解答欄をクリックしてから、この電卓の値を貼り付けてください。");
+      return;
+    }
+    if (calc.cur === "エラー") return;
+    target.value = calc.cur;
+    target.dispatchEvent(new Event("input", { bubbles: true }));
+    target.focus();
+  };
+
+  /* 電卓にフォーカスがあるときだけキー操作を受け付ける（解答欄の入力を邪魔しない） */
+  calcEl.addEventListener("keydown", function (e) {
+    var k = e.key;
+    var map = { Enter: "=", "=": "=", Backspace: "BS", Delete: "C", Escape: null };
+    if (/^\d$/.test(k)) { calcKey(k); e.preventDefault(); return; }
+    if (k === "." || k === "*" || k === "/" || k === "+" || k === "-") { calcKey(k); e.preventDefault(); return; }
+    if (k === "x" || k === "X") { calcKey("*"); e.preventDefault(); return; }
+    if (k === "Escape") { calcOpen(false); e.preventDefault(); return; }
+    if (map[k]) { calcKey(map[k]); e.preventDefault(); }
+  });
+
+  /* Alt+C でどこからでも開閉 */
+  document.addEventListener("keydown", function (e) {
+    if (e.altKey && (e.code === "KeyC" || e.key === "c" || e.key === "C")) {
+      calcOpen(!calcIsOpen());
+      e.preventDefault();
+    }
+  });
+
+  /* ドラッグで移動（位置は記憶する） */
+  (function enableCalcDrag() {
+    var head = document.getElementById("calc-head");
+    var drag = null;
+    head.addEventListener("pointerdown", function (e) {
+      if (e.target.id === "calc-close") return;
+      var r = calcEl.getBoundingClientRect();
+      drag = { dx: e.clientX - r.left, dy: e.clientY - r.top, w: r.width, h: r.height };
+      head.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    head.addEventListener("pointermove", function (e) {
+      if (!drag) return;
+      var x = Math.min(Math.max(0, e.clientX - drag.dx), window.innerWidth - drag.w);
+      var y = Math.min(Math.max(0, e.clientY - drag.dy), window.innerHeight - drag.h);
+      calcEl.style.left = x + "px";
+      calcEl.style.top = y + "px";
+      calcEl.style.right = "auto";
+      calcEl.style.bottom = "auto";
+    });
+    head.addEventListener("pointerup", function (e) {
+      if (!drag) return;
+      drag = null;
+      head.releasePointerCapture(e.pointerId);
+      var st = lsGet("boki_v1_calc", {});
+      st.left = calcEl.style.left;
+      st.top = calcEl.style.top;
+      lsSet("boki_v1_calc", st);
+    });
+  })();
+
+  /* 前回の開閉状態・位置を復元 */
+  (function restoreCalc() {
+    var st = lsGet("boki_v1_calc", {});
+    if (st.left && st.top) {
+      calcEl.style.left = st.left;
+      calcEl.style.top = st.top;
+      calcEl.style.right = "auto";
+      calcEl.style.bottom = "auto";
+    }
+    if (st.open) calcEl.classList.remove("hidden");
+    calcRender();
+  })();
 
   /* デバッグ用（コンソールから採点ロジックを検証できる） */
   BOKI.debug = {

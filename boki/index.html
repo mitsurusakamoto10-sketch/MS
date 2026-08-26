@@ -20,6 +20,47 @@
     </footer>
   </div>
 
+  <!-- 電卓（本試験と同様に画面上で使える。Alt+C または右下のボタンで開閉） -->
+  <button type="button" id="calc-toggle" class="calc-fab" title="電卓を開く（Alt+C）">🖩</button>
+  <div id="calc" class="calc hidden" tabindex="0" role="dialog" aria-label="電卓">
+    <div class="calc-head" id="calc-head">
+      <span>🖩 電卓</span>
+      <span class="calc-hint">Alt+C で開閉・ドラッグで移動</span>
+      <button type="button" id="calc-close" class="calc-close" title="閉じる">×</button>
+    </div>
+    <div class="calc-display">
+      <div class="calc-sub" id="calc-sub"></div>
+      <div class="calc-main" id="calc-main">0</div>
+    </div>
+    <div class="calc-keys">
+      <button type="button" class="k-fn" data-k="MC">MC</button>
+      <button type="button" class="k-fn" data-k="MR">MR</button>
+      <button type="button" class="k-fn" data-k="M-">M−</button>
+      <button type="button" class="k-fn" data-k="M+">M+</button>
+      <button type="button" class="k-fn" data-k="AC">AC</button>
+      <button type="button" class="k-fn" data-k="C">C</button>
+      <button type="button" class="k-fn" data-k="BS">⌫</button>
+      <button type="button" class="k-op" data-k="/">÷</button>
+      <button type="button" data-k="7">7</button>
+      <button type="button" data-k="8">8</button>
+      <button type="button" data-k="9">9</button>
+      <button type="button" class="k-op" data-k="*">×</button>
+      <button type="button" data-k="4">4</button>
+      <button type="button" data-k="5">5</button>
+      <button type="button" data-k="6">6</button>
+      <button type="button" class="k-op" data-k="-">−</button>
+      <button type="button" data-k="1">1</button>
+      <button type="button" data-k="2">2</button>
+      <button type="button" data-k="3">3</button>
+      <button type="button" class="k-op" data-k="+">＋</button>
+      <button type="button" data-k="0">0</button>
+      <button type="button" data-k="00">00</button>
+      <button type="button" data-k=".">.</button>
+      <button type="button" class="k-eq" data-k="=">＝</button>
+    </div>
+    <button type="button" id="calc-paste" class="calc-paste">直前の解答欄へ貼り付け</button>
+  </div>
+
   <!-- 問題データ（registry → 模試 → 演習プールの順に読み込む） -->
   <script src="data/registry.js"></script>
   <script src="data/mock1.js"></script>
