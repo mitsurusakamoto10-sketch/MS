@@ -48,7 +48,11 @@ const COMPANIES = [
   {
     // 自社サイトは403・PR TIMESは配信が乏しい → 公式IR配信(IRpocket 3231)を優先
     name: "野村不動産",
-    feeds: [irpocket(3231), prt(38280)],
+    feeds: [
+      prt(25694), // 公式PR TIMESアカウント（38280は別法人で空だった）
+      "https://www.nomura-re-hd.co.jp/news/rss.xml",
+      irpocket(3231),
+    ],
   },
   {
     name: "東急不動産",
