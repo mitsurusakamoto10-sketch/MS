@@ -417,7 +417,7 @@ async function loadHotelBank(force) {
   }
 }
 
-// 競合各社リリース（PR TIMES・直近10日・最新順／会社名 + 日付 + リリース名）
+// 競合各社リリース（各社の公式発信・直近14日・最新順／会社名 + 日付 + リリース名）
 async function loadPRTimes(force) {
   const el = document.getElementById("prtimes-grid");
   if (!el) return;
