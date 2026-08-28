@@ -22,32 +22,21 @@ function prt(id) {
 function html(url) {
   return { html: url };
 }
-// Google News RSS（社名検索・公式以外の報道も含む補完用）
-function gnews(query) {
-  return (
-    "https://news.google.com/rss/search?q=" +
-    encodeURIComponent('"' + query + '"') +
-    "&hl=ja&gl=JP&ceid=JP:ja"
-  );
-}
-// Bing News RSS（社名検索・補完用。Google Newsが不可な環境向け）
-function bingnews(query) {
-  return (
-    "https://www.bing.com/news/search?q=" +
-    encodeURIComponent('"' + query + '"') +
-    "&format=rss&setlang=ja-JP&cc=JP"
-  );
+// 公式IR配信(IRpocket)のリリースRDF（証券コード指定・各社の公式リリースのみ）
+function irpocket(code) {
+  return "https://xml.irpocket.com/" + code + "/XML/release-all-latest-12m.rdf";
 }
 
 // 各社の候補フィード（上から順に試し、最初に取れたものを採用）
-// 自社RSSを先頭に置く社は、そちらが“真の最新”になる。
+// ※すべて「その会社自身が発信した公式リリース」のみを情報源とする。
+//   （ニュース検索＝第三者報道や他社リリースが混ざるため使用しない）
 const COMPANIES = [
-  { name: "三井不動産", feeds: [prt(51782)] },                 // 自社403 → PR TIMES
-  { name: "三菱地所", feeds: [prt(16002)] },                   // 自社403 → PR TIMES
+  { name: "三井不動産", feeds: [prt(51782)] },                 // 自社403 → PR TIMES公式アカウント
+  { name: "三菱地所", feeds: [prt(16002)] },                   // 自社403 → PR TIMES公式アカウント
   {
     name: "住友不動産",
     feeds: [
-      "https://www.sumitomo-rd.co.jp/news/feed/",            // 自社RSS（最新・6月分含む）
+      "https://www.sumitomo-rd.co.jp/news/feed/",            // 自社RSS（公式・最新）
       "https://www.sumitomo-rd.co.jp/feed/",
       prt(46698),
     ],
@@ -56,24 +45,28 @@ const COMPANIES = [
     name: "東京建物",
     feeds: ["https://tatemono.com/news/rss/news.php", prt(52843)], // 自社RSS優先
   },
-  { name: "野村不動産", feeds: [prt(38280), bingnews("野村不動産"), gnews("野村不動産")] }, // 自社403・PR TIMES空 → ニュース検索で補完
+  {
+    // 自社サイトは403・PR TIMESは配信が乏しい → 公式IR配信(IRpocket 3231)を優先
+    name: "野村不動産",
+    feeds: [irpocket(3231), prt(38280)],
+  },
   {
     name: "東急不動産",
     feeds: [
       "https://www.tokyu-fudosan-hd.co.jp/news/others/rss",  // 自社RSS優先
-      "https://xml.irpocket.com/3289/XML/release-all-latest-12m.rdf",
+      irpocket(3289),
       "https://www.tokyu-fudosan-hd.co.jp/news/companies/rss",
       prt(6953),
     ],
   },
-  { name: "森トラスト", feeds: [prt(18049)] },                 // 自社はHTMLのみ → PR TIMES
+  { name: "森トラスト", feeds: [prt(18049)] },                 // 自社はHTMLのみ → PR TIMES公式
   {
-    // 自社サイトはJS描画(E-IRウィジェット)で静的取得不可・PR TIMESは古い
-    // → Bing News（社名検索）で最新を補完。PR TIMESを最終フォールバック。
+    // 自社サイトはJS描画(E-IRウィジェット)で静的取得不可
+    // → 公式IR配信(IRpocket 3003)を優先、PR TIMES公式を予備に
     name: "ヒューリック",
-    feeds: [bingnews("ヒューリック"), prt(46371)],
+    feeds: [irpocket(3003), prt(46371)],
   },
-  { name: "森ビル", feeds: [prt(48109)] },                     // 自社はHTMLのみ → PR TIMES
+  { name: "森ビル", feeds: [prt(48109)] },                     // 自社はHTMLのみ → PR TIMES公式
 ];
 
 const BROWSER_HEADERS = {
@@ -238,12 +231,7 @@ export async function onRequest(context) {
         const isHtml = typeof f === "object" && f.html;
         const url = isHtml ? f.html : f;
         try {
-          // Google Newsは同意画面リダイレクト回避のためCONSENT Cookieを付与
-          const headers = Object.assign({}, BROWSER_HEADERS);
-          if (url.indexOf("news.google.com") >= 0) {
-            headers["Cookie"] = "CONSENT=YES+cb.20211129-04-p0.en+F+060";
-          }
-          const res = await fetch(url, { headers, redirect: "follow" });
+          const res = await fetch(url, { headers: BROWSER_HEADERS, redirect: "follow" });
           if (!res.ok) continue;
           const text = await res.text();
           const all = isHtml ? scrapeHtml(url, text) : parseFeed(text);
